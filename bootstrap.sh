@@ -78,54 +78,21 @@ info "Data count: $DATA_COUNT"
 info "Output:     $OUTPUT_DIR"
 echo ""
 
-# ── Step 0: Ensure we are inside the repo ─────────────────────────────────────
+# ── Step 0: Verify we are inside the repo ────────────────────────────────────
 info "Step 0/6 — Checking environment..."
 
-# If this script is being run from outside the repo dir (e.g. piped or called
-# from a parent), cd into the repo — cloning if needed, pulling if stale.
+# Resolve the directory containing this script and cd into it.
+# This ensures the script works regardless of how it was invoked.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_NAME="cortex-mvp"
+cd "$SCRIPT_DIR"
+info "  Repo root: $(pwd)"
 
-if [[ -f "$SCRIPT_DIR/cortex/__init__.py" ]]; then
-  # Already inside the repo
-  cd "$SCRIPT_DIR"
-  info "  Running from repo root: $(pwd)"
-
-  # Sync with remote if git is available and we have a remote
-  if command -v git &>/dev/null && git -C . rev-parse --is-inside-work-tree &>/dev/null; then
-    if git remote get-url origin &>/dev/null; then
-      info "  Pulling latest changes from origin..."
-      git pull --ff-only origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null \
-        || warn "  Could not pull (local changes present or offline) — continuing with current version."
-    fi
-  fi
-
-else
-  # We are NOT inside the repo — find or clone it
-  TARGET_DIR="$(pwd)/$REPO_NAME"
-
-  if [[ -d "$TARGET_DIR/.git" ]]; then
-    # Repo exists but we're outside it — just cd in and pull
-    info "  Repo already exists at $TARGET_DIR — pulling latest..."
-    cd "$TARGET_DIR"
+# Pull latest if we have a git remote (skip gracefully if offline/dirty)
+if command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
+  if git remote get-url origin &>/dev/null 2>&1; then
+    info "  Syncing with origin..."
     git pull --ff-only origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null \
-      || warn "  Could not pull (local changes present or offline) — continuing with current version."
-
-  elif [[ -d "$TARGET_DIR" && ! -d "$TARGET_DIR/.git" ]]; then
-    # Directory exists but is NOT a git repo — something is wrong
-    error "  Directory '$TARGET_DIR' exists but is not a git repository."
-    error "  Remove it and re-run: rm -rf $TARGET_DIR"
-    exit 1
-
-  else
-    # Fresh clone
-    if ! command -v git &>/dev/null; then
-      error "  git is not installed. Install with: sudo apt install git"
-      exit 1
-    fi
-    info "  Cloning $REPO_URL into $TARGET_DIR ..."
-    git clone "$REPO_URL" "$TARGET_DIR"
-    cd "$TARGET_DIR"
+      || warn "  Could not pull (offline or local changes) — using current version."
   fi
 fi
 
