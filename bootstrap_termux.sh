@@ -154,7 +154,9 @@ pip install --upgrade pip -q 2>/dev/null || true
 
 # Install core deps (no GPU stack — Termux can't run CUDA)
 info "  Installing Python dependencies..."
-pip install -q jsonschema pytest 2>&1 | tail -3
+# Pin jsonschema to 4.17.3 which uses pyrsistent (pure Python) not rpds-py (Rust).
+# rpds-py requires Rust to build from source and fails on most Termux/ARM installs.
+pip install -q "jsonschema==4.17.3" "pyrsistent>=0.18.0" pytest 2>&1 | tail -3
 
 # Install training stack only if not data-only and not demo
 if ! $DATA_ONLY && ! $DEMO; then

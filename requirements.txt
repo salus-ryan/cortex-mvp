@@ -1,6 +1,8 @@
 # Core runtime
-jsonschema>=4.0.0
-pydantic>=2.0.0
+# jsonschema 4.17.3 uses pyrsistent (pure Python) instead of rpds-py (Rust)
+# This is required for Termux/ARM compatibility — do not upgrade past 4.17.x
+jsonschema==4.17.3
+pyrsistent>=0.18.0
 
 # Testing
 pytest>=7.0.0
