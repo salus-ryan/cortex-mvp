@@ -46,6 +46,12 @@ from cortex.tool_registry import ExecutionResult, ToolRegistry
 from cortex.trajectory_logger import StepRecord, TrajectoryLogger
 from cortex.verifier import Verifier
 
+# Optional persistent store — imported lazily so the runtime works without it
+try:
+    from cortex.store import TrajectoryStore as _TrajectoryStore
+except ImportError:
+    _TrajectoryStore = None  # type: ignore
+
 
 MAX_STEPS = 30
 
@@ -90,6 +96,8 @@ class CortexRuntime:
         model_fn: Callable[[str], str],
         workspace: str = "/workspace",
         output_dir: Optional[Path] = None,
+        store: Optional[Any] = None,
+        model_ver: str = "unknown",
     ) -> None:
         """
         Args:
@@ -97,15 +105,27 @@ class CortexRuntime:
                       the model's proposed SCL action text.
             workspace: Root directory for all file operations.
             output_dir: Directory for trajectory logs and training data.
+            store: Optional TrajectoryStore for persistent SQLite logging.
+                   If None, a default store at data/cortex.db is created.
+            model_ver: Model checkpoint identifier (for the tasks table).
         """
         self.model_fn = model_fn
         self.workspace = workspace
         self.output_dir = output_dir or Path("data/trajectories")
+        self.model_ver = model_ver
 
         self.tool_registry = ToolRegistry(workspace=workspace)
         self.policy = Policy()
         self.verifier = Verifier(workspace=workspace)
         self.logger = TrajectoryLogger(output_dir=self.output_dir)
+
+        # Persistent store (SQLite)
+        if store is not None:
+            self._store = store
+        elif _TrajectoryStore is not None:
+            self._store = _TrajectoryStore(Path("data/cortex.db"))
+        else:
+            self._store = None
 
     def run(self, task: Task) -> RuntimeResult:
         """
@@ -131,6 +151,10 @@ class CortexRuntime:
 
         observation = "task started"
         traj = self.logger.start_trajectory(task.task_id, task.goal)
+
+        # Register task in persistent store
+        if self._store is not None:
+            self._store.start_task(task.task_id, task.goal, model_ver=self.model_ver)
 
         for step in range(task.max_steps):
             # Check budget before each step
@@ -293,11 +317,34 @@ class CortexRuntime:
             self.logger.accepted(task.task_id, record, execution_result, verify_post)
             memory.audit_log("accepted", step, {"action": action.raw, "cost": cost})
 
+            # --- Persist to SQLite ---
+            if self._store is not None:
+                _reward = 0.5 if execution_result.success else -0.5
+                self._store.log_step(
+                    task_id=task.task_id,
+                    step=step,
+                    prompt=prompt,
+                    completion=action_text,
+                    phase=state.get("phase", "act"),
+                    goal=task.goal,
+                    scl_valid=parse_result.valid,
+                    policy_ok=policy_result.allowed,
+                    verified=verify_post.passed,
+                    outcome="success" if execution_result.success else "error",
+                    reward=_reward,
+                    units_used=cost,
+                    tool_name=action.fields.get("name") if action.anchor == "@tool" else None,
+                    risk_tier=self.tool_registry.risk_tier(action.fields.get("name", ""))
+                              if action.anchor == "@tool" else None,
+                )
+
             # --- Update observation ---
             observation = execution_result.summary
 
         # Max steps reached
         self.logger.finish_trajectory(task.task_id, "max_steps", budget.used_units)
+        if self._store is not None:
+            self._store.finish_task(task.task_id, "max_steps", MAX_STEPS, budget.used_units)
         return RuntimeResult(
             task_id=task.task_id,
             status="max_steps",
