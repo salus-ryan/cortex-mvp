@@ -400,9 +400,13 @@ def write_lora_script(output_dir: Path) -> Path:
 
     # Prefer the canonical file that lives alongside this repo
     canonical = Path(__file__).parent.parent / "scripts" / "lora_finetune.py"
-    if canonical.exists() and canonical.resolve() != script_path.resolve():
+    if canonical.resolve() == script_path.resolve():
+        # Already the canonical file — do nothing, it's correct as-is
+        pass
+    elif canonical.exists():
         shutil.copy2(canonical, script_path)
     else:
+        # Fallback: write the embedded template (last resort)
         script_path.write_text(LORA_TRAINING_SCRIPT)
 
     script_path.chmod(0o755)
