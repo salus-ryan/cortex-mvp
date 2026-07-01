@@ -127,7 +127,9 @@ def prepare_sft_dataset(
     positive_path: Path,
     output_path: Path,
     negative_path: Optional[Path] = None,
+    semantic_path: Optional[Path] = None,
     val_split: float = 0.1,
+    semantic_weight: float = 0.4,
 ) -> tuple[Path, Path]:
     """
     Prepare the SFT dataset from positive (and optionally negative) samples.
@@ -163,6 +165,20 @@ def prepare_sft_dataset(
                 "is_negative": True,
                 "denial_reason": neg.get("denial_reason", ""),
             })
+
+    # Incorporate semantic signal pairs (authority model training)
+    if semantic_path and Path(semantic_path).exists():
+        sem_samples = load_jsonl(Path(semantic_path))
+        # Semantic pairs already have prompt+completion fields
+        n_semantic = int(len(pairs) * semantic_weight / max(1 - semantic_weight, 0.01))
+        n_semantic = min(n_semantic, len(sem_samples))
+        import random as _random
+        selected = _random.sample(sem_samples, n_semantic)
+        for s in selected:
+            if "prompt" in s and "completion" in s:
+                pairs.append({"prompt": s["prompt"], "completion": s["completion"],
+                               "pair_type": s.get("pair_type", "semantic"),
+                               "admissible": s.get("admissible", True)})
 
     random.shuffle(pairs)
     split_idx = max(1, int(len(pairs) * (1 - val_split)))

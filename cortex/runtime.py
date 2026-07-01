@@ -47,6 +47,8 @@ from cortex.trajectory_logger import StepRecord, TrajectoryLogger
 from cortex.verifier import Verifier
 from cortex.scl_emitter import SCLEmitter
 from cortex.health import HealthMonitor
+from cortex.calibration import CalibratedConfidenceGate, TemperatureScaler, EntropyEstimator
+from cortex.constrained_decoder import SCLGrammar, GreedySCLDecoder, is_complete_scl
 
 # Optional persistent store — imported lazily so the runtime works without it
 try:
@@ -132,6 +134,15 @@ class CortexRuntime:
             self._store = _TrajectoryStore(Path("data/cortex.db"))
         else:
             self._store = None
+
+        # Calibrated confidence gate
+        self._calibration_gate = CalibratedConfidenceGate(
+            scaler=TemperatureScaler(Path("data/calibration.json")),
+            estimator=EntropyEstimator(),
+        )
+
+        # SCL grammar (used for prefix validation and greedy fallback)
+        self._grammar = SCLGrammar()
 
         # Health monitor — runs silently at startup and can be watched
         self._health = HealthMonitor(
@@ -272,6 +283,15 @@ class CortexRuntime:
 
             # --- Halt handling ---
             if action.anchor == "@halt":
+                # Calibration gate: reject halts with uncalibrated confidence
+                stated_conf = float(action.fields.get("confidence", 0.7))
+                cal_result = self._calibration_gate.check(stated_conf)
+                if not cal_result.admissible:
+                    observation = f"halt rejected (calibration): {cal_result.reason}"
+                    memory.audit_log("halt_rejected_calibration", step, {"reason": cal_result.reason})
+                    self.logger.denied(task.task_id, record, cal_result.reason, "denied_calibration")
+                    continue
+
                 final_check = self.verifier.final_check(task.goal, state, action)
                 memory.audit_log("halt_proposed", step, {"status": action.fields.get("status"), "passed": final_check.passed})
 
