@@ -45,6 +45,8 @@ from cortex.scl_parser import SCLAction, parse as scl_parse
 from cortex.tool_registry import ExecutionResult, ToolRegistry
 from cortex.trajectory_logger import StepRecord, TrajectoryLogger
 from cortex.verifier import Verifier
+from cortex.scl_emitter import SCLEmitter
+from cortex.health import HealthMonitor
 
 # Optional persistent store — imported lazily so the runtime works without it
 try:
@@ -109,7 +111,11 @@ class CortexRuntime:
                    If None, a default store at data/cortex.db is created.
             model_ver: Model checkpoint identifier (for the tasks table).
         """
-        self.model_fn = model_fn
+        # SCL emitter wraps model_fn — invalid SCL is structurally impossible
+        self._emitter = SCLEmitter()
+        self.model_fn = self._emitter.wrap(model_fn)
+        self._raw_model_fn = model_fn
+
         self.workspace = workspace
         self.output_dir = output_dir or Path("data/trajectories")
         self.model_ver = model_ver
@@ -126,6 +132,13 @@ class CortexRuntime:
             self._store = _TrajectoryStore(Path("data/cortex.db"))
         else:
             self._store = None
+
+        # Health monitor — runs silently at startup and can be watched
+        self._health = HealthMonitor(
+            db_path=self._store.db_path if self._store else Path("data/cortex.db"),
+            emitter=self._emitter,
+        )
+        self._health.run(silent=True)  # silent startup check + auto-repair
 
     def run(self, task: Task) -> RuntimeResult:
         """
