@@ -20,9 +20,40 @@
 #   deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
 # =============================================================================
 
-set -euo pipefail
+# ── SELF-UPDATE: must be the very first thing, before everything else ─────────
+# This block runs before argument parsing, before the banner, before any output.
+# It ensures a stale clone always pulls the latest bootstrap.sh and re-execs.
+# Guard: CORTEX_UPDATED=1 prevents infinite re-exec loop.
+if [[ -z "${CORTEX_UPDATED:-}" ]]; then
+  # Resolve the directory this script lives in
+  _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+  cd "$_SELF_DIR"
 
-REPO_URL="https://github.com/salus-ryan/cortex-mvp.git"
+  # Fix blank or missing remote — set it if not already pointing at the repo
+  _CURRENT_REMOTE="$(git remote get-url origin 2>/dev/null || true)"
+  _REPO_URL="https://github.com/salus-ryan/cortex-mvp.git"
+  if [[ -z "$_CURRENT_REMOTE" || "$_CURRENT_REMOTE" == " " ]]; then
+    git remote set-url origin "$_REPO_URL" 2>/dev/null \
+      || git remote add origin "$_REPO_URL" 2>/dev/null \
+      || true
+  fi
+
+  # Pull and re-exec only if new commits were fetched
+  if command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
+    _BEFORE="$(git rev-parse HEAD 2>/dev/null)"
+    git pull --ff-only origin "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)" \
+      --quiet 2>/dev/null || true
+    _AFTER="$(git rev-parse HEAD 2>/dev/null)"
+    if [[ "$_BEFORE" != "$_AFTER" ]]; then
+      export CORTEX_UPDATED=1
+      exec bash "${BASH_SOURCE[0]}" "$@"
+    fi
+  fi
+  export CORTEX_UPDATED=1
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
+set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 MODEL="Qwen/Qwen2.5-0.5B-Instruct"
@@ -78,35 +109,14 @@ info "Data count: $DATA_COUNT"
 info "Output:     $OUTPUT_DIR"
 echo ""
 
-# ── Step 0: Self-update then verify environment ──────────────────────────────
+# ── Step 0: Verify environment ────────────────────────────────────────────────
 info "Step 0/6 — Checking environment..."
 
-# Always resolve and cd into the repo root first, regardless of how the
-# script was invoked (from parent dir, via path, etc.)
+# Ensure we are in the repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 info "  Repo root: $(pwd)"
-
-# Pull latest changes BEFORE doing anything else.
-# This ensures a stale clone always runs the current bootstrap.sh.
-# Only re-exec if git pull actually fetched new commits (avoids infinite loop).
-# Skip entirely if CORTEX_UPDATED is already set (we already self-updated).
-if [[ -z "${CORTEX_UPDATED:-}" ]] && command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
-  if git remote get-url origin &>/dev/null 2>&1; then
-    info "  Pulling latest from origin..."
-    BEFORE=$(git rev-parse HEAD 2>/dev/null)
-    git pull --ff-only origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null \
-      || warn "  Could not pull (offline or local changes) — using current version."
-    AFTER=$(git rev-parse HEAD 2>/dev/null)
-    if [[ "$BEFORE" != "$AFTER" ]]; then
-      info "  Updated $BEFORE → $AFTER. Re-executing updated bootstrap.sh..."
-      export CORTEX_UPDATED=1
-      exec bash "${BASH_SOURCE[0]}" "$@"
-    else
-      info "  Already up to date."
-    fi
-  fi
-fi
+info "  Git commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 # ── Python check ──────────────────────────────────────────────────────────────
 PYTHON=""
