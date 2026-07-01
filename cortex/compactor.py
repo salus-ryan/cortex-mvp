@@ -55,6 +55,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from cortex.store import TrajectoryStore
+from cortex.reward import VerifiableRewardFunction, RewardStore, RewardResult
 
 _DEFAULT_QUALITY_THRESHOLD = 0.6
 _DEFAULT_DEDUP_JACCARD = 0.85
@@ -144,8 +145,8 @@ def deduplicate(
 
 # ── SFT formatting ────────────────────────────────────────────────────────────
 
-def _to_sft_pair(row: Any) -> Dict[str, str]:
-    return {
+def _to_sft_pair(row: Any, reward_result: Optional[Any] = None) -> Dict[str, str]:
+    pair = {
         "prompt":     row["prompt"] or "",
         "completion": row["completion"] or "",
         "quality":    round(quality_score(row), 4),
@@ -153,6 +154,14 @@ def _to_sft_pair(row: Any) -> Dict[str, str]:
         "outcome":    row["outcome"],
         "reward":     row["reward"],
     }
+    if reward_result:
+        # Augment with verifiable reward fields for GRPO-ready training
+        pair["verifiable_reward"] = reward_result.reward
+        pair["goal_score"]        = reward_result.goal_score
+        pair["det_score"]         = reward_result.det_score
+        pair["relative_rank"]     = reward_result.relative_rank
+        pair["goal_scl"]          = reward_result.goal_scl
+    return pair
 
 
 # ── Compactor ─────────────────────────────────────────────────────────────────
@@ -177,6 +186,10 @@ class Compactor:
         val_fraction: float = 0.1,
         output_dir: Path = Path("data/sft"),
         retrain_growth_factor: float = _RETRAIN_GROWTH_FACTOR,
+        reward_fn: Optional[Any] = None,
+        reward_store: Optional[Any] = None,
+        corpus_path: Optional[Path] = None,
+        corpus_weight: float = 0.3,
     ):
         self.store = store
         self.quality_threshold = quality_threshold
@@ -184,6 +197,10 @@ class Compactor:
         self.val_fraction = val_fraction
         self.output_dir = Path(output_dir)
         self.retrain_growth_factor = retrain_growth_factor
+        self.reward_fn = reward_fn
+        self.reward_store = reward_store
+        self.corpus_path = corpus_path
+        self.corpus_weight = corpus_weight
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -202,8 +219,33 @@ class Compactor:
         rows = self._fetch(strategy)
         rows_in = len(rows)
 
-        # Quality filter
+        # Quality filter (proxy axes)
         passing = [r for r in rows if quality_score(r) >= self.quality_threshold]
+
+        # Verifiable reward filter (goal achievement — primary signal)
+        reward_map: Dict[str, Any] = {}
+        if self.reward_fn and self.reward_store:
+            filtered = []
+            for r in passing:
+                # sqlite3.Row doesn't support .get() — convert to dict first
+                rd = dict(r) if not isinstance(r, dict) else r
+                # Compute verifiable reward for this step
+                rr = self.reward_fn.compute(
+                    task_id=rd["task_id"],
+                    goal_scl=rd.get("goal", ""),
+                    trajectory=[{"scl": rd["completion"], "outcome": rd["outcome"]}],
+                    final_scl=rd["completion"] or "",
+                    final_outcome=rd["outcome"],
+                    budget_remaining=1.0,
+                    policy_violations=0 if rd.get("policy_ok") else 1,
+                )
+                self.reward_store.save(rr)
+                _compl = (r["completion"] or "")[:32]
+                reward_map[r["task_id"] + _compl] = rr
+                # Only keep rows where goal achievement score >= 0.5
+                if rr.goal_score >= 0.5:
+                    filtered.append(r)
+            passing = filtered
 
         # Deduplication
         clean = deduplicate(passing, self.jaccard_threshold)
@@ -218,17 +260,48 @@ class Compactor:
                 "quality_threshold": self.quality_threshold,
             }
 
+        # Inject SCL-native corpus examples
+        corpus_pairs: List[Dict] = []
+        if self.corpus_path and Path(self.corpus_path).exists():
+            with open(self.corpus_path) as f:
+                corpus_all = [json.loads(line) for line in f if line.strip()]
+            n_inject = int(len(clean) * self.corpus_weight / max(1 - self.corpus_weight, 0.01))
+            n_inject = min(n_inject, len(corpus_all))
+            import random as _rng
+            corpus_pairs = _rng.sample(corpus_all, n_inject)
+
         # Split train/val
         val_n = max(1, int(rows_out * self.val_fraction))
         val_rows   = clean[:val_n]
         train_rows = clean[val_n:]
 
-        # Export
+        # Export — augment with verifiable reward metadata
         self.output_dir.mkdir(parents=True, exist_ok=True)
         train_path = self.output_dir / "sft_train.jsonl"
         val_path   = self.output_dir / "sft_val.jsonl"
-        _write_jsonl(train_path, [_to_sft_pair(r) for r in train_rows])
-        _write_jsonl(val_path,   [_to_sft_pair(r) for r in val_rows])
+
+        def _pair_with_reward(r):
+            key = r["task_id"] + (r["completion"] or "")[:32]
+            return _to_sft_pair(r, reward_map.get(key))
+
+        train_sft = [_pair_with_reward(r) for r in train_rows]
+        val_sft   = [_pair_with_reward(r) for r in val_rows]
+
+        # Append SCL-native corpus pairs to train set
+        for cp in corpus_pairs:
+            if "prompt" in cp and "completion" in cp:
+                train_sft.append({
+                    "prompt":     cp["prompt"],
+                    "completion": cp["completion"],
+                    "quality":    cp.get("quality", 1.0),
+                    "task_id":    "corpus",
+                    "outcome":    "success",
+                    "reward":     1.0,
+                    "corpus_type": cp.get("type", "scl_native"),
+                })
+
+        _write_jsonl(train_path, train_sft)
+        _write_jsonl(val_path,   val_sft)
 
         # Log to DB
         self.store.log_compaction(
@@ -241,12 +314,13 @@ class Compactor:
         )
 
         # Recursive retrain signal
-        retrain_needed = self._check_retrain(rows_out)
+        retrain_needed = self._check_retrain(len(train_sft))
         if retrain_needed:
             _RETRAIN_SENTINEL.parent.mkdir(parents=True, exist_ok=True)
             _RETRAIN_SENTINEL.write_text(
                 json.dumps({
                     "rows_out": rows_out,
+                    "corpus_injected": len(corpus_pairs),
                     "train_path": str(train_path),
                     "val_path": str(val_path),
                 })
@@ -256,6 +330,7 @@ class Compactor:
             "strategy": strategy,
             "rows_in": rows_in,
             "rows_out": rows_out,
+            "corpus_injected": len(corpus_pairs),
             "train_path": str(train_path),
             "val_path": str(val_path),
             "quality_threshold": self.quality_threshold,
@@ -264,23 +339,27 @@ class Compactor:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _fetch(self, strategy: str) -> List[Any]:
-        """Fetch rows from the store according to strategy."""
+    def _fetch(self, strategy: str) -> List[Dict[str, Any]]:
+        """Fetch rows from the store according to strategy, returned as plain dicts."""
+        def _to_dicts(rows):
+            return [dict(r) for r in rows]
+
         if strategy == "full":
-            return self.store.query(limit=500_000)
+            return _to_dicts(self.store.query(limit=500_000))
         elif strategy == "quality_filter":
             # Re-score everything; quality filter happens in compact()
-            return self.store.query(limit=500_000)
+            return _to_dicts(self.store.query(limit=500_000))
         else:
             # incremental: rows since last compaction
             last_ts = self._last_compaction_ts()
             if last_ts is None:
-                return self.store.query(limit=500_000)
+                return _to_dicts(self.store.query(limit=500_000))
             with self.store._conn() as conn:
-                return conn.execute(
+                rows = conn.execute(
                     "SELECT * FROM trajectories WHERE ts > ? ORDER BY reward DESC",
                     (last_ts,),
                 ).fetchall()
+            return _to_dicts(rows)
 
     def _last_compaction_ts(self) -> Optional[str]:
         with self.store._conn() as conn:

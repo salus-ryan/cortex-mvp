@@ -92,9 +92,24 @@ def _current_checkpoint() -> Optional[str]:
     return None
 
 
-def compact(store: TrajectoryStore, strategy: str = "incremental") -> dict:
+def compact(
+    store: TrajectoryStore,
+    strategy: str = "incremental",
+    corpus_path: Optional[Path] = None,
+    use_reward: bool = True,
+) -> dict:
     """Run a compaction pass and return the result dict."""
-    c = Compactor(store, output_dir=_SFT_DIR)
+    from cortex.reward import VerifiableRewardFunction, RewardStore
+    reward_fn    = VerifiableRewardFunction() if use_reward else None
+    reward_store = RewardStore(Path("data/rewards.db")) if use_reward else None
+    c = Compactor(
+        store,
+        output_dir=_SFT_DIR,
+        reward_fn=reward_fn,
+        reward_store=reward_store,
+        corpus_path=corpus_path,
+        corpus_weight=0.3,
+    )
     result = c.compact_recursive(strategy=strategy)
     return result[-1] if result else {}
 
@@ -143,6 +158,21 @@ def retrain(
     return str(output_dir)
 
 
+def _ensure_corpus(corpus_path: Optional[Path] = None, n: int = 500) -> Optional[Path]:
+    """Auto-generate SCL-native corpus if it doesn't exist yet."""
+    path = corpus_path or Path("data/scl_corpus.jsonl")
+    if not path.exists():
+        try:
+            from cortex.scl_corpus import SCLCorpusGenerator
+            gen = SCLCorpusGenerator()
+            result = gen.generate_and_save(path, n_total=n)
+            print(f"[learner] Generated SCL-native corpus: {result['total']} examples → {path}")
+        except Exception as e:
+            print(f"[learner] Corpus generation failed (non-fatal): {e}")
+            return None
+    return path
+
+
 def run_once(
     store: TrajectoryStore,
     strategy: str = "incremental",
@@ -151,10 +181,15 @@ def run_once(
     epochs: int = 1,
     batch_size: int = 4,
     model_base: Optional[str] = None,
+    corpus_path: Optional[Path] = None,
+    use_reward: bool = True,
 ) -> dict:
     """Compact, then retrain if the sentinel is set (or force=True)."""
+    # Auto-generate SCL-native corpus if not provided
+    resolved_corpus = _ensure_corpus(corpus_path)
     print(f"[learner] Compacting ({strategy})...")
-    compact_result = compact(store, strategy=strategy)
+    compact_result = compact(store, strategy=strategy,
+                             corpus_path=resolved_corpus, use_reward=use_reward)
     print(f"[learner] Compact: {compact_result.get('rows_in',0)} in → "
           f"{compact_result.get('rows_out',0)} out")
 
