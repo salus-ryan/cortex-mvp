@@ -33,6 +33,7 @@ SKIP_TESTS=false
 DATA_ONLY=false
 CPU_ONLY=false
 OUTPUT_DIR="models/cortex-lora"
+VENV_DIR=".venv"
 
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
@@ -50,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --lora-r)      LORA_R="$2";     shift 2 ;;
     --count)       DATA_COUNT="$2"; shift 2 ;;
     --output)      OUTPUT_DIR="$2"; shift 2 ;;
+    --venv)        VENV_DIR="$2";   shift 2 ;;
     --skip-tests)  SKIP_TESTS=true; shift ;;
     --data-only)   DATA_ONLY=true;  shift ;;
     --cpu)         CPU_ONLY=true;   shift ;;
@@ -76,19 +78,60 @@ echo ""
 
 # ── Step 0: Python check ───────────────────────────────────────────────────────
 info "Step 0/6 — Checking Python..."
-python3 --version || { error "Python 3 required"; exit 1; }
-PYTHON=$(which python3)
 
-# ── Step 1: Install dependencies ──────────────────────────────────────────────
-info "Step 1/6 — Installing dependencies..."
+# Find python3.11+ (prefer 3.11/3.12, fall back to python3)
+PYTHON=""
+for candidate in python3.12 python3.11 python3.10 python3; do
+  if command -v "$candidate" &>/dev/null; then
+    PYTHON=$(command -v "$candidate")
+    break
+  fi
+done
 
-# Core runtime deps (always required)
-pip install --quiet jsonschema
+if [[ -z "$PYTHON" ]]; then
+  error "Python 3 not found. Install it with: sudo apt install python3 python3-venv python3-full"
+  exit 1
+fi
 
-# Training deps (only if not data-only or cpu-only)
+PY_VERSION=$("$PYTHON" --version 2>&1)
+info "  Found: $PY_VERSION at $PYTHON"
+
+# Check python3-venv / venv module is available
+if ! "$PYTHON" -m venv --help &>/dev/null; then
+  error "python3-venv is not installed."
+  error "Fix with: sudo apt install python3-venv python3-full"
+  exit 1
+fi
+
+# ── Step 1: Create and activate venv ──────────────────────────────────────────
+info "Step 1/6 — Setting up virtual environment..."
+
+if [[ ! -d "$VENV_DIR" ]]; then
+  info "  Creating venv at $VENV_DIR ..."
+  "$PYTHON" -m venv "$VENV_DIR"
+else
+  info "  Reusing existing venv at $VENV_DIR"
+fi
+
+# Activate
+# shellcheck disable=SC1091
+source "$VENV_DIR/bin/activate"
+PYTHON="$VENV_DIR/bin/python"
+PIP="$VENV_DIR/bin/pip"
+
+info "  Activated: $("$PYTHON" --version)"
+
+# Upgrade pip silently
+"$PIP" install --quiet --upgrade pip
+
+# Install core requirements (always)
+info "  Installing requirements.txt (core runtime + pytest)..."
+"$PIP" install --quiet jsonschema pytest
+
+# Install training stack unless skipped
 if [[ "$DATA_ONLY" == false && "$CPU_ONLY" == false ]]; then
   info "  Installing training stack (transformers, peft, trl, datasets, accelerate)..."
-  pip install --quiet \
+  "$PIP" install --quiet \
     transformers \
     peft \
     trl \
@@ -99,14 +142,15 @@ if [[ "$DATA_ONLY" == false && "$CPU_ONLY" == false ]]; then
     protobuf
   info "  Training stack installed."
 elif [[ "$CPU_ONLY" == true ]]; then
-  warn "  --cpu flag set: skipping training stack installation."
+  warn "  --cpu flag set: skipping training stack."
+elif [[ "$DATA_ONLY" == true ]]; then
+  warn "  --data-only flag set: skipping training stack."
 fi
 
 # ── Step 2: Run tests ──────────────────────────────────────────────────────────
 if [[ "$SKIP_TESTS" == false ]]; then
   info "Step 2/6 — Running test suite..."
-  pip install --quiet pytest
-  python3 -m pytest tests/ -q --tb=short
+  "$PYTHON" -m pytest tests/ -q --tb=short
   info "  All tests passed."
 else
   warn "Step 2/6 — Tests skipped (--skip-tests)."
@@ -115,12 +159,12 @@ fi
 # ── Step 3: Generate synthetic data ───────────────────────────────────────────
 info "Step 3/6 — Generating synthetic training data ($DATA_COUNT samples)..."
 mkdir -p data
-python3 scripts/generate_data.py --output data/ --count "$DATA_COUNT" --seed 42
+"$PYTHON" scripts/generate_data.py --output data/ --count "$DATA_COUNT" --seed 42
 info "  Generated: data/train_positive.jsonl, data/train_negative.jsonl"
 
 # ── Step 4: Prepare SFT dataset ───────────────────────────────────────────────
 info "Step 4/6 — Preparing SFT dataset..."
-python3 - <<'PYEOF'
+"$PYTHON" - <<'PYEOF'
 import sys
 from pathlib import Path
 sys.path.insert(0, ".")
@@ -139,7 +183,7 @@ info "  SFT dataset ready."
 
 # ── Step 5: Write LoRA script ──────────────────────────────────────────────────
 info "Step 5/6 — Writing LoRA fine-tuning script..."
-python3 - <<'PYEOF'
+"$PYTHON" - <<'PYEOF'
 import sys
 from pathlib import Path
 sys.path.insert(0, ".")
@@ -154,7 +198,8 @@ if [[ "$DATA_ONLY" == true ]]; then
   echo ""
   info "Data is ready. To train, run:"
   echo ""
-  echo "  python3 scripts/lora_finetune.py \\"
+  echo "  source $VENV_DIR/bin/activate"
+  echo "  python scripts/lora_finetune.py \\"
   echo "    --model $MODEL \\"
   echo "    --train data/sft/sft_train.jsonl \\"
   echo "    --val   data/sft/sft_val.jsonl \\"
@@ -165,7 +210,7 @@ if [[ "$DATA_ONLY" == true ]]; then
 fi
 
 if [[ "$CPU_ONLY" == true ]]; then
-  warn "Step 6/6 — Training skipped (--cpu). Dry-run only."
+  warn "Step 6/6 — Training skipped (--cpu). Dry-run complete."
   echo ""
   info "To train on a GPU machine, run:"
   echo ""
@@ -185,7 +230,7 @@ echo ""
 
 mkdir -p "$OUTPUT_DIR"
 
-python3 scripts/lora_finetune.py \
+"$PYTHON" scripts/lora_finetune.py \
   --model      "$MODEL" \
   --train      data/sft/sft_train.jsonl \
   --val        data/sft/sft_val.jsonl \
@@ -204,13 +249,13 @@ info "Model saved to: $OUTPUT_DIR"
 echo ""
 info "To run the evaluation benchmark:"
 echo ""
-echo "  python3 -c \""
+echo "  source $VENV_DIR/bin/activate"
+echo "  python -c \""
 echo "  import sys; sys.path.insert(0, '.')"
 echo "  from transformers import pipeline"
 echo "  from cortex.eval import run_eval"
-echo "  from cortex.trainer import format_prompt"
 echo "  pipe = pipeline('text-generation', model='$OUTPUT_DIR', max_new_tokens=64)"
-echo "  def model_fn(prompt): return pipe(prompt)[0]['generated_text'][len(prompt):]"
+echo "  def model_fn(p): return pipe(p)[0]['generated_text'][len(p):]"
 echo "  run_eval(model_fn)"
 echo "  \""
 echo ""
