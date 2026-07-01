@@ -78,21 +78,33 @@ info "Data count: $DATA_COUNT"
 info "Output:     $OUTPUT_DIR"
 echo ""
 
-# ── Step 0: Verify we are inside the repo ────────────────────────────────────
+# ── Step 0: Self-update then verify environment ──────────────────────────────
 info "Step 0/6 — Checking environment..."
 
-# Resolve the directory containing this script and cd into it.
-# This ensures the script works regardless of how it was invoked.
+# Always resolve and cd into the repo root first, regardless of how the
+# script was invoked (from parent dir, via path, etc.)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 info "  Repo root: $(pwd)"
 
-# Pull latest if we have a git remote (skip gracefully if offline/dirty)
-if command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
+# Pull latest changes BEFORE doing anything else.
+# This ensures a stale clone always runs the current bootstrap.sh.
+# Only re-exec if git pull actually fetched new commits (avoids infinite loop).
+# Skip entirely if CORTEX_UPDATED is already set (we already self-updated).
+if [[ -z "${CORTEX_UPDATED:-}" ]] && command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
   if git remote get-url origin &>/dev/null 2>&1; then
-    info "  Syncing with origin..."
+    info "  Pulling latest from origin..."
+    BEFORE=$(git rev-parse HEAD 2>/dev/null)
     git pull --ff-only origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null \
       || warn "  Could not pull (offline or local changes) — using current version."
+    AFTER=$(git rev-parse HEAD 2>/dev/null)
+    if [[ "$BEFORE" != "$AFTER" ]]; then
+      info "  Updated $BEFORE → $AFTER. Re-executing updated bootstrap.sh..."
+      export CORTEX_UPDATED=1
+      exec bash "${BASH_SOURCE[0]}" "$@"
+    else
+      info "  Already up to date."
+    fi
   fi
 fi
 
