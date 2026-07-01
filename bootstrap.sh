@@ -22,6 +22,8 @@
 
 set -euo pipefail
 
+REPO_URL="https://github.com/salus-ryan/cortex-mvp.git"
+
 # ── Defaults ──────────────────────────────────────────────────────────────────
 MODEL="Qwen/Qwen2.5-0.5B-Instruct"
 EPOCHS=3
@@ -76,10 +78,58 @@ info "Data count: $DATA_COUNT"
 info "Output:     $OUTPUT_DIR"
 echo ""
 
-# ── Step 0: Python check ───────────────────────────────────────────────────────
-info "Step 0/6 — Checking Python..."
+# ── Step 0: Ensure we are inside the repo ─────────────────────────────────────
+info "Step 0/6 — Checking environment..."
 
-# Find python3.11+ (prefer 3.11/3.12, fall back to python3)
+# If this script is being run from outside the repo dir (e.g. piped or called
+# from a parent), cd into the repo — cloning if needed, pulling if stale.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_NAME="cortex-mvp"
+
+if [[ -f "$SCRIPT_DIR/cortex/__init__.py" ]]; then
+  # Already inside the repo
+  cd "$SCRIPT_DIR"
+  info "  Running from repo root: $(pwd)"
+
+  # Sync with remote if git is available and we have a remote
+  if command -v git &>/dev/null && git -C . rev-parse --is-inside-work-tree &>/dev/null; then
+    if git remote get-url origin &>/dev/null; then
+      info "  Pulling latest changes from origin..."
+      git pull --ff-only origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null \
+        || warn "  Could not pull (local changes present or offline) — continuing with current version."
+    fi
+  fi
+
+else
+  # We are NOT inside the repo — find or clone it
+  TARGET_DIR="$(pwd)/$REPO_NAME"
+
+  if [[ -d "$TARGET_DIR/.git" ]]; then
+    # Repo exists but we're outside it — just cd in and pull
+    info "  Repo already exists at $TARGET_DIR — pulling latest..."
+    cd "$TARGET_DIR"
+    git pull --ff-only origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null \
+      || warn "  Could not pull (local changes present or offline) — continuing with current version."
+
+  elif [[ -d "$TARGET_DIR" && ! -d "$TARGET_DIR/.git" ]]; then
+    # Directory exists but is NOT a git repo — something is wrong
+    error "  Directory '$TARGET_DIR' exists but is not a git repository."
+    error "  Remove it and re-run: rm -rf $TARGET_DIR"
+    exit 1
+
+  else
+    # Fresh clone
+    if ! command -v git &>/dev/null; then
+      error "  git is not installed. Install with: sudo apt install git"
+      exit 1
+    fi
+    info "  Cloning $REPO_URL into $TARGET_DIR ..."
+    git clone "$REPO_URL" "$TARGET_DIR"
+    cd "$TARGET_DIR"
+  fi
+fi
+
+# ── Python check ──────────────────────────────────────────────────────────────
 PYTHON=""
 for candidate in python3.12 python3.11 python3.10 python3; do
   if command -v "$candidate" &>/dev/null; then
@@ -89,14 +139,14 @@ for candidate in python3.12 python3.11 python3.10 python3; do
 done
 
 if [[ -z "$PYTHON" ]]; then
-  error "Python 3 not found. Install it with: sudo apt install python3 python3-venv python3-full"
+  error "Python 3 not found. Install with: sudo apt install python3 python3-venv python3-full"
   exit 1
 fi
 
 PY_VERSION=$("$PYTHON" --version 2>&1)
-info "  Found: $PY_VERSION at $PYTHON"
+info "  Python: $PY_VERSION at $PYTHON"
 
-# Check python3-venv / venv module is available
+# Check venv module
 if ! "$PYTHON" -m venv --help &>/dev/null; then
   error "python3-venv is not installed."
   error "Fix with: sudo apt install python3-venv python3-full"
@@ -124,8 +174,8 @@ info "  Activated: $("$PYTHON" --version)"
 # Upgrade pip silently
 "$PIP" install --quiet --upgrade pip
 
-# Install core requirements (always)
-info "  Installing requirements.txt (core runtime + pytest)..."
+# Install core runtime deps (always required)
+info "  Installing core deps (jsonschema, pytest)..."
 "$PIP" install --quiet jsonschema pytest
 
 # Install training stack unless skipped
