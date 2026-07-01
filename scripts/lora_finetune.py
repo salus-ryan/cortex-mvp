@@ -81,7 +81,18 @@ def main():
     train_data = Dataset.from_list([format_sample(s) for s in load_jsonl(args.train)])
     val_data = Dataset.from_list([format_sample(s) for s in load_jsonl(args.val)])
 
-    # Training arguments
+    # Training arguments — handle both old (<4.46) and new (>=4.46) transformers APIs
+    import transformers as _tf
+    import torch
+    _tf_version = tuple(int(x) for x in _tf.__version__.split(".")[:2])
+    _use_new_api = _tf_version >= (4, 46)
+
+    # fp16 only on CUDA; bf16 on Ampere+ CUDA or MPS; otherwise plain float
+    _use_fp16 = torch.cuda.is_available() and not torch.cuda.is_bf16_supported()
+    _use_bf16 = (torch.cuda.is_available() and torch.cuda.is_bf16_supported()) or                 (hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+    _eval_kwarg = {"eval_strategy": "steps"} if _use_new_api else {"evaluation_strategy": "steps"}
+
     training_args = TrainingArguments(
         output_dir=args.output,
         num_train_epochs=args.epochs,
@@ -93,19 +104,25 @@ def main():
         logging_steps=10,
         eval_steps=50,
         save_steps=100,
-        evaluation_strategy="steps",
+        **_eval_kwarg,
         save_total_limit=2,
         load_best_model_at_end=True,
         report_to="none",
-        fp16=True,
+        fp16=_use_fp16,
+        bf16=_use_bf16,
     )
+
+    # SFTTrainer API: tokenizer kwarg renamed to processing_class in trl>=0.12
+    import trl as _trl
+    _trl_version = tuple(int(x) for x in _trl.__version__.split(".")[:2])
+    _tok_kwarg = "processing_class" if _trl_version >= (0, 12) else "tokenizer"
 
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=train_data,
         eval_dataset=val_data,
-        tokenizer=tokenizer,
+        **{_tok_kwarg: tokenizer},
         max_seq_length=args.max_seq_len,
         dataset_text_field="text",
     )
