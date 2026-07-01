@@ -265,6 +265,25 @@ class CortexRuntime:
                 if final_check.passed:
                     self.logger.halted(task.task_id, record, action.fields.get("status", "complete"), final_check.evidence)
                     self.logger.finish_trajectory(task.task_id, "success", budget.used_units)
+                    # Persist halt step to SQLite
+                    if self._store is not None:
+                        self._store.log_step(
+                            task_id=task.task_id,
+                            step=step,
+                            prompt=prompt,
+                            completion=action_text,
+                            phase=state.get("phase", "halt"),
+                            goal=task.goal,
+                            scl_valid=True,
+                            policy_ok=True,
+                            verified=True,
+                            outcome="success",
+                            reward=1.0,
+                            units_used=0,
+                            tool_name=None,
+                            risk_tier=None,
+                        )
+                        self._store.finish_task(task.task_id, "success", step + 1, budget.used_units)
                     return RuntimeResult(
                         task_id=task.task_id,
                         status="success",
