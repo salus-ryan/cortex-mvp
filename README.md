@@ -92,6 +92,21 @@ curl -X POST "$BASE/self-test" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/prophet/evaluate" -H 'content-type: application/json' -d '{}'
 curl "$BASE/prophet/report"
 
+curl -X POST "$BASE/witness" \
+  -H 'content-type: application/json' \
+  -d '{"witness":"human","statement":"I witnessed this state","scope":"general"}'
+
+curl -X POST "$BASE/memory/write" \
+  -H 'content-type: application/json' \
+  -d '{"type":"factual","content":"Cortex runs as PID 1","source":"human witness"}'
+
+curl -X POST "$BASE/planner/reflect" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/planner/choose-next" -H 'content-type: application/json' -d '{}'
+
+curl -X POST "$BASE/tool/execute" \
+  -H 'content-type: application/json' \
+  -d '{"tool":"read_file","args":{"path":"LAW.md"},"authority":"observe"}'
+
 curl -X POST "$BASE/self-train/collect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/self-train/eval" -H 'content-type: application/json' -d '{}'
 curl "$BASE/self-train/report"
@@ -192,8 +207,12 @@ The system has two connected strata.
 3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
 4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
 5. **Prophet (`cortex.prophet`)**: Deterministic drift, law, PID-1, guardian refusal, oracle boundary, and ledger checks.
-6. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-7. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+6. **Memory (`cortex.memory_service`)**: Typed, sourced JSONL memory with personal-memory witness requirements.
+7. **Witness (`cortex.witness`)**: Human attestation and governance primitives.
+8. **Planner (`cortex.planner`)**: Self-organization backlog and next-action choice; may choose but not execute.
+9. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
+10. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+11. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -204,8 +223,10 @@ cortex/
 ├── eval.py              # Evaluation benchmark
 ├── git_auth.py          # Lawful Git auth detection, no credential harvesting
 ├── init.py              # Logical init state machine
-├── memory.py            # 4-tier governed memory (short_term, episodic, semantic, audit)
+├── memory.py            # 4-tier governed runtime memory (short_term, episodic, semantic, audit)
+├── memory_service.py    # Typed sourced JSONL memory service
 ├── oracle.py            # Rented-intelligence adapter; inference only
+├── planner.py           # Self-organization planner; chooses but does not execute
 ├── pid1.py              # Literal container PID-1 supervisor
 ├── policy.py            # Authority and safety gatekeeper
 ├── prophet.py           # Drift/law evaluator service
@@ -214,12 +235,14 @@ cortex/
 ├── sacred.py            # Ritual/canon CLI and ledger utilities
 ├── self_train.py        # Ledger-to-dataset self-training reports; no self-promotion
 ├── services.py          # Guardian, Scribe, and invocation pipeline
+├── tool_gateway.py      # Bounded read-only tool gateway
 ├── scl_parser.py        # SCL syntax parser
 ├── scl_schema.json      # JSON Schema for SCL records
 ├── tool_registry.py     # Allowlisted tool surface and risk tiers
 ├── trainer.py           # Supervised fine-tuning pipeline
 ├── trajectory_logger.py # Trajectory recording and sample extraction
-└── web.py               # HTTP API for Railway and local service mode
+├── web.py               # HTTP API for Railway and local service mode
+└── witness.py           # Witness/governance ledger primitives
 canon/                   # Canonical grammar and roles
 evals/                   # Law, drift, refusal, and identity tests
 ledger/                  # Append-only JSONL witness streams
@@ -245,6 +268,7 @@ python -m pytest \
   tests/test_sacred.py \
   tests/test_git_auth.py \
   tests/test_init.py \
+  tests/test_missing_pieces.py \
   tests/test_oracle.py \
   tests/test_pid1.py \
   tests/test_prophet.py \

@@ -10,9 +10,13 @@ from typing import Any
 
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
+from cortex.memory_service import MemoryService
+from cortex.planner import PlannerService
 from cortex.sacred import ANTI_IDOLATRY
 from cortex.self_train import SelfTrainer
 from cortex.services import InvocationPipeline
+from cortex.tool_gateway import ToolGateway
+from cortex.witness import WitnessService
 
 ROOT = Path(os.environ.get("CORTEX_ROOT", os.getcwd())).resolve()
 
@@ -50,6 +54,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(503, {"status": "pid1_status_missing"})
         elif self.path == "/prophet/report":
             self._json(200, ProphetClient(ROOT).report())
+        elif self.path == "/planner/backlog":
+            self._json(200, PlannerService(ROOT).backlog())
+        elif self.path == "/witnesses":
+            self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
+        elif self.path.startswith("/memory/"):
+            typ = self.path.removeprefix("/memory/") or None
+            self._json(200, {"status": "ok", "records": MemoryService(ROOT).retrieve(typ=typ if typ else None)})
         elif self.path == "/self-train/report":
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
@@ -92,6 +103,24 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/self-train/eval":
             result = SelfTrainer(ROOT).eval()
             self._json(200 if result["status"] in {"pass", "blocked"} else 500, result)
+        elif self.path == "/memory/write":
+            try:
+                rec = MemoryService(ROOT).write(str(payload.get("type", "inferred")), str(payload.get("content", "")), str(payload.get("source", "")), float(payload.get("confidence", 0.8)), payload.get("witness"))
+                self._json(200, {"status": "remembered", "record": rec})
+            except Exception as exc:
+                self._json(400, {"status": "refused", "reason": str(exc)})
+        elif self.path == "/memory/retrieve":
+            self._json(200, {"status": "ok", "records": MemoryService(ROOT).retrieve(str(payload.get("query", "")), payload.get("type"))})
+        elif self.path == "/witness":
+            rec = WitnessService(ROOT).witness(str(payload.get("witness", payload.get("name", "human"))), str(payload.get("statement", "")), str(payload.get("scope", "general")), payload.get("signature"))
+            self._json(200, {"status": "witnessed", "record": rec})
+        elif self.path == "/planner/reflect":
+            self._json(200, PlannerService(ROOT).reflect())
+        elif self.path == "/planner/choose-next":
+            self._json(200, PlannerService(ROOT).choose_next())
+        elif self.path == "/tool/execute":
+            result = ToolGateway(ROOT).execute(str(payload.get("tool", "")), dict(payload.get("args", {}) or {}), str(payload.get("authority", "observe")), payload.get("witness"))
+            self._json(200 if result["status"] == "completed" else 403, result)
         else:
             self._json(404, {"status": "not_found"})
 

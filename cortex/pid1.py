@@ -80,6 +80,24 @@ DEFAULT_CHILDREN = [
         restart="on-failure",
         authority="interpret",
     ),
+    ChildSpec(
+        name="memory",
+        command=[sys.executable, "-m", "cortex.service_server", "memory"],
+        restart="on-failure",
+        authority="observe",
+    ),
+    ChildSpec(
+        name="tool",
+        command=[sys.executable, "-m", "cortex.service_server", "tool"],
+        restart="on-failure",
+        authority="observe",
+    ),
+    ChildSpec(
+        name="planner",
+        command=[sys.executable, "-m", "cortex.service_server", "planner"],
+        restart="on-failure",
+        authority="prepare",
+    ),
 ]
 
 

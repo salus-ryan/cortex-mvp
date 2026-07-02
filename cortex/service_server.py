@@ -10,11 +10,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from cortex.memory_service import MemoryService
 from cortex.oracle import OracleService
+from cortex.planner import PlannerService
 from cortex.prophet import ProphetService
 from cortex.services import GuardianService, ScribeService
+from cortex.tool_gateway import ToolGateway
 
-DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104}
+DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107}
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict[str, Any]) -> None:
@@ -48,6 +51,9 @@ class RoleHandler(BaseHTTPRequestHandler):
             return
         if self.role == "prophet" and self.path == "/report":
             _json_response(self, 200, ProphetService(self.root).latest())
+            return
+        if self.role == "planner" and self.path == "/backlog":
+            _json_response(self, 200, PlannerService(self.root).backlog())
             return
         _json_response(self, 404, {"status": "not_found", "role": self.role})
 
@@ -84,6 +90,29 @@ class RoleHandler(BaseHTTPRequestHandler):
 
         if self.role == "prophet" and self.path == "/evaluate":
             _json_response(self, 200, ProphetService(self.root).evaluate())
+            return
+
+        if self.role == "memory" and self.path == "/write":
+            try:
+                rec = MemoryService(self.root).write(str(payload.get("type", "inferred")), str(payload.get("content", "")), str(payload.get("source", "")), float(payload.get("confidence", 0.8)), payload.get("witness"))
+                _json_response(self, 200, {"status": "remembered", "record": rec})
+            except Exception as exc:
+                _json_response(self, 400, {"status": "refused", "reason": str(exc)})
+            return
+        if self.role == "memory" and self.path == "/retrieve":
+            _json_response(self, 200, {"status": "ok", "records": MemoryService(self.root).retrieve(str(payload.get("query", "")), payload.get("type"))})
+            return
+
+        if self.role == "tool" and self.path == "/execute":
+            result = ToolGateway(self.root).execute(str(payload.get("tool", "")), dict(payload.get("args", {}) or {}), str(payload.get("authority", "observe")), payload.get("witness"))
+            _json_response(self, 200 if result["status"] == "completed" else 403, result)
+            return
+
+        if self.role == "planner" and self.path == "/reflect":
+            _json_response(self, 200, PlannerService(self.root).reflect())
+            return
+        if self.role == "planner" and self.path == "/choose-next":
+            _json_response(self, 200, PlannerService(self.root).choose_next())
             return
 
         _json_response(self, 404, {"status": "not_found", "role": self.role})

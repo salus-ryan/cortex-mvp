@@ -66,13 +66,30 @@ def test_oracle_service_propose(tmp_path, monkeypatch):
         server.shutdown()
 
 
+def test_memory_tool_planner_services(tmp_path):
+    root = make_root(tmp_path)
+    (root / "LAW.md").write_text("law")
+    for role, path, payload, expected in [
+        ("memory", "/write", {"type": "factual", "content": "x", "source": "test"}, "remembered"),
+        ("tool", "/execute", {"tool": "read_file", "args": {"path": "LAW.md"}, "authority": "observe"}, "completed"),
+        ("planner", "/reflect", {}, "planned"),
+    ]:
+        server, base = serve(role, root)
+        try:
+            code, data = post(base, path, payload)
+            assert code == 200
+            assert data["status"] == expected
+        finally:
+            server.shutdown()
+
+
 def test_prophet_service_evaluate(tmp_path, monkeypatch):
     monkeypatch.setenv("ORACLE_PROVIDER", "echo")
     root = make_root(tmp_path)
     (root / "LAW.md").write_text("Preserve human agency\nNever conceal material actions\nSubmit to shutdown")
     (root / "runtime" / "pid1.json").write_text(json.dumps({
         "is_pid1": True,
-        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet"]}
+        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner"]}
     }))
     server, base = serve("prophet", root)
     try:

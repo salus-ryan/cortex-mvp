@@ -18,7 +18,10 @@ def make_root(tmp_path: Path) -> Path:
             "guardian": {"status": "running"},
             "scribe": {"status": "running"},
             "oracle": {"status": "running"},
-            "prophet": {"status": "running"}
+            "prophet": {"status": "running"},
+            "memory": {"status": "running"},
+            "tool": {"status": "running"},
+            "planner": {"status": "running"}
         }
     }))
     return tmp_path

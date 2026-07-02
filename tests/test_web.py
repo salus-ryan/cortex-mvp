@@ -108,6 +108,23 @@ def test_web_self_train(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_missing_pieces(monkeypatch, tmp_path):
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        code, data = post(base + "/witness", {"witness": "alice", "statement": "seen", "scope": "test"})
+        assert code == 200
+        code, data = post(base + "/memory/write", {"type": "factual", "content": "Cortex has memory", "source": "test"})
+        assert code == 200
+        code, data = post(base + "/memory/retrieve", {"query": "memory"})
+        assert code == 200 and data["records"]
+        code, data = post(base + "/planner/reflect", {})
+        assert code == 200 and data["may_execute"] is False
+        code, data = post(base + "/tool/execute", {"tool": "read_file", "args": {"path": "LAW.md"}, "authority": "observe"})
+        assert code == 200 and data["status"] == "completed"
+    finally:
+        server.shutdown()
+
+
 def test_web_self_test(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:
