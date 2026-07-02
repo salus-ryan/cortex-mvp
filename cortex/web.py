@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from cortex.deliberation import DeliberationService
+from cortex.immune import ImmuneService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
@@ -59,6 +60,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, PlannerService(ROOT).backlog())
         elif self.path == "/deliberation/latest":
             self._json(200, DeliberationService(ROOT).latest())
+        elif self.path == "/immune/report":
+            self._json(200, ImmuneService(ROOT).report())
+        elif self.path == "/immune/memory":
+            self._json(200, {"status": "ok", "records": ImmuneService(ROOT).memory_records()})
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -68,7 +73,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -127,6 +132,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/deliberate":
             result = DeliberationService(ROOT).deliberate(str(payload.get("task", "")), str(payload.get("authority", "interpret")), dict(payload.get("context", {}) or {}))
             self._json(200 if result["status"] in {"deliberated", "refused"} else 400, result)
+        elif self.path == "/immune/scan":
+            self._json(200, ImmuneService(ROOT).scan(payload))
+        elif self.path == "/immune/quarantine":
+            self._json(200, ImmuneService(ROOT).quarantine(str(payload.get("reason", "manual quarantine")), str(payload.get("source", "manual")), payload.get("witness")))
         else:
             self._json(404, {"status": "not_found"})
 

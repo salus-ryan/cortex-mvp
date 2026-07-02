@@ -104,6 +104,12 @@ DEFAULT_CHILDREN = [
         restart="on-failure",
         authority="interpret",
     ),
+    ChildSpec(
+        name="immune",
+        command=[sys.executable, "-m", "cortex.service_server", "immune"],
+        restart="on-failure",
+        authority="interpret",
+    ),
 ]
 
 

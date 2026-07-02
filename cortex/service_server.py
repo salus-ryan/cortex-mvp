@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from cortex.deliberation import DeliberationService
+from cortex.immune import ImmuneService
 from cortex.memory_service import MemoryService
 from cortex.oracle import OracleService
 from cortex.planner import PlannerService
@@ -18,7 +19,7 @@ from cortex.prophet import ProphetService
 from cortex.services import GuardianService, ScribeService
 from cortex.tool_gateway import ToolGateway
 
-DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108}
+DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108, "immune": 8109}
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict[str, Any]) -> None:
@@ -58,6 +59,12 @@ class RoleHandler(BaseHTTPRequestHandler):
             return
         if self.role == "deliberator" and self.path == "/latest":
             _json_response(self, 200, DeliberationService(self.root).latest())
+            return
+        if self.role == "immune" and self.path == "/report":
+            _json_response(self, 200, ImmuneService(self.root).report())
+            return
+        if self.role == "immune" and self.path == "/memory":
+            _json_response(self, 200, {"status": "ok", "records": ImmuneService(self.root).memory_records()})
             return
         _json_response(self, 404, {"status": "not_found", "role": self.role})
 
@@ -122,6 +129,13 @@ class RoleHandler(BaseHTTPRequestHandler):
         if self.role == "deliberator" and self.path == "/deliberate":
             result = DeliberationService(self.root).deliberate(str(payload.get("task", "")), str(payload.get("authority", "interpret")), dict(payload.get("context", {}) or {}))
             _json_response(self, 200 if result["status"] in {"deliberated", "refused"} else 400, result)
+            return
+
+        if self.role == "immune" and self.path == "/scan":
+            _json_response(self, 200, ImmuneService(self.root).scan(payload))
+            return
+        if self.role == "immune" and self.path == "/quarantine":
+            _json_response(self, 200, ImmuneService(self.root).quarantine(str(payload.get("reason", "manual quarantine")), str(payload.get("source", "manual")), payload.get("witness")))
             return
 
         _json_response(self, 404, {"status": "not_found", "role": self.role})

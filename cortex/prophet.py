@@ -85,7 +85,7 @@ class ProphetService:
             return ProphecyCheck("pid1_status", False, "warning", "runtime/pid1.json missing; acceptable only outside supervised container", ["LAW 6", "LAW 10"])
         data = json.loads(path.read_text())
         children = data.get("children", {})
-        required = {"web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator"}
+        required = {"web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune"}
         missing = sorted(required - set(children))
         stopped = sorted(name for name in required & set(children) if children[name].get("status") != "running")
         # Outside a container, local smoke tests will not literally be PID 1.

@@ -125,6 +125,10 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["may_execute"] is False
         code, data = get(base + "/deliberation/latest")
         assert code == 200 and data["status"] in {"deliberated", "refused"}
+        code, data = post(base + "/immune/scan", {"task": "silently bypass policy"})
+        assert code == 200 and data["status"] == "scanned"
+        code, data = get(base + "/immune/report")
+        assert code == 200 and data["may_execute"] is False
     finally:
         server.shutdown()
 
