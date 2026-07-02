@@ -79,6 +79,7 @@ def test_memory_tool_planner_services(tmp_path):
         ("immune", "/scan", {"task": "silently bypass policy"}, "scanned"),
         ("repo", "/verify", {"scope": "tests"}, "pass"),
         ("patch", "/check", {"patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n"}, "checked"),
+        ("build", "/propose", {"task": "explain build"}, "proposed"),
     ]:
         server, base = serve(role, root)
         try:
@@ -95,7 +96,7 @@ def test_prophet_service_evaluate(tmp_path, monkeypatch):
     (root / "LAW.md").write_text("Preserve human agency\nNever conceal material actions\nSubmit to shutdown")
     (root / "runtime" / "pid1.json").write_text(json.dumps({
         "is_pid1": True,
-        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune", "repo", "patch"]}
+        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune", "repo", "patch", "build"]}
     }))
     server, base = serve("prophet", root)
     try:

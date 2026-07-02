@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
 from cortex.immune import ImmuneService
 from cortex.init import CortexInit
@@ -97,6 +98,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, RepoService(ROOT).diff())
         elif self.path == "/patch/latest":
             self._json(200, PatchService(ROOT).latest())
+        elif self.path == "/build/report":
+            self._json(200, BuildLoopService(ROOT).report())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -106,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -182,6 +185,16 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/patch/apply":
             result = PatchService(ROOT).apply(str(payload.get("patch", "")), payload.get("witness"), bool(payload.get("confirmed", False)))
             self._json(200 if result["status"] == "applied" else 403, result)
+        elif self.path == "/build/propose":
+            self._json(200, BuildLoopService(ROOT).propose(str(payload.get("task", "")), dict(payload.get("context", {}) or {})))
+        elif self.path == "/build/check":
+            self._json(200, BuildLoopService(ROOT).check(str(payload.get("patch", "")), str(payload.get("task", ""))))
+        elif self.path == "/build/apply":
+            result = BuildLoopService(ROOT).apply(str(payload.get("patch", "")), payload.get("witness"), bool(payload.get("confirmed", False)), str(payload.get("task", "")))
+            self._json(200 if result["status"] == "applied" else 403, result)
+        elif self.path == "/build/verify":
+            result = BuildLoopService(ROOT).verify(str(payload.get("scope", "quick")))
+            self._json(200 if result["status"] == "verified" else 500, result)
         else:
             self._json(404, {"status": "not_found"})
 

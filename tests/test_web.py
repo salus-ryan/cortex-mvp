@@ -154,6 +154,10 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["status"] == "pass"
         code, data = post(base + "/patch/check", {"patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n"})
         assert code == 200 and data["status"] == "checked"
+        code, data = post(base + "/build/propose", {"task": "explain build"})
+        assert code == 200 and data["status"] == "proposed"
+        code, data = get(base + "/build/report")
+        assert code == 200 and data["may_execute"] is False
     finally:
         server.shutdown()
 
