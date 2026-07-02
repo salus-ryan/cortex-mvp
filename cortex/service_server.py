@@ -16,10 +16,11 @@ from cortex.memory_service import MemoryService
 from cortex.oracle import OracleService
 from cortex.planner import PlannerService
 from cortex.prophet import ProphetService
+from cortex.repo_service import RepoService
 from cortex.services import GuardianService, ScribeService
 from cortex.tool_gateway import ToolGateway
 
-DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108, "immune": 8109}
+DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108, "immune": 8109, "repo": 8110}
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict[str, Any]) -> None:
@@ -65,6 +66,12 @@ class RoleHandler(BaseHTTPRequestHandler):
             return
         if self.role == "immune" and self.path == "/memory":
             _json_response(self, 200, {"status": "ok", "records": ImmuneService(self.root).memory_records()})
+            return
+        if self.role == "repo" and self.path == "/status":
+            _json_response(self, 200, RepoService(self.root).status())
+            return
+        if self.role == "repo" and self.path == "/diff":
+            _json_response(self, 200, RepoService(self.root).diff())
             return
         _json_response(self, 404, {"status": "not_found", "role": self.role})
 
@@ -136,6 +143,14 @@ class RoleHandler(BaseHTTPRequestHandler):
             return
         if self.role == "immune" and self.path == "/quarantine":
             _json_response(self, 200, ImmuneService(self.root).quarantine(str(payload.get("reason", "manual quarantine")), str(payload.get("source", "manual")), payload.get("witness")))
+            return
+
+        if self.role == "repo" and self.path == "/verify":
+            try:
+                result = RepoService(self.root).verify(str(payload.get("scope", "tests")))
+                _json_response(self, 200 if result["status"] == "pass" else 500, result)
+            except Exception as exc:
+                _json_response(self, 400, {"status": "refused", "reason": str(exc), "may_execute": False})
             return
 
         _json_response(self, 404, {"status": "not_found", "role": self.role})

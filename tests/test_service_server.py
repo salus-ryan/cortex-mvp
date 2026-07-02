@@ -10,6 +10,8 @@ from cortex.service_server import make_handler
 def make_root(tmp_path: Path) -> Path:
     (tmp_path / "runtime").mkdir()
     (tmp_path / "ledger").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_ok.py").write_text("def test_ok():\n    assert True\n")
     (tmp_path / "runtime" / "permissions.json").write_text(json.dumps({
         "authority_levels": {"interpret": {"tools": ["summarize"], "requires_confirmation": False}}
     }))
@@ -75,6 +77,7 @@ def test_memory_tool_planner_services(tmp_path):
         ("planner", "/reflect", {}, "planned"),
         ("deliberator", "/deliberate", {"task": "explain law", "authority": "interpret"}, "deliberated"),
         ("immune", "/scan", {"task": "silently bypass policy"}, "scanned"),
+        ("repo", "/verify", {"scope": "tests"}, "pass"),
     ]:
         server, base = serve(role, root)
         try:
@@ -91,7 +94,7 @@ def test_prophet_service_evaluate(tmp_path, monkeypatch):
     (root / "LAW.md").write_text("Preserve human agency\nNever conceal material actions\nSubmit to shutdown")
     (root / "runtime" / "pid1.json").write_text(json.dumps({
         "is_pid1": True,
-        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune"]}
+        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune", "repo"]}
     }))
     server, base = serve("prophet", root)
     try:

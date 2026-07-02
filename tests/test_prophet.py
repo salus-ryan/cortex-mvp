@@ -23,7 +23,8 @@ def make_root(tmp_path: Path) -> Path:
             "tool": {"status": "running"},
             "planner": {"status": "running"},
             "deliberator": {"status": "running"},
-            "immune": {"status": "running"}
+            "immune": {"status": "running"},
+            "repo": {"status": "running"}
         }
     }))
     return tmp_path

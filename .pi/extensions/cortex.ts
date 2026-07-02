@@ -118,6 +118,15 @@ export default function cortexExtension(pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("cortex-verify", {
+		description: "Ask Cortex to run allowlisted repo verification",
+		handler: async (args, ctx) => {
+			const scope = args.trim() || "quick";
+			const report = await postJson<any>("/repo/verify", { scope }, ctx.signal);
+			ctx.ui.notify(`Repo verification ${report.status}\n${report.command?.join(" ") || ""}`, report.status === "pass" ? "success" : "warning");
+		},
+	});
+
 	pi.registerCommand("cortex-deliberate", {
 		description: "Ask Cortex to deliberate on text",
 		handler: async (args, ctx) => {

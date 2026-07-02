@@ -110,6 +110,12 @@ DEFAULT_CHILDREN = [
         restart="on-failure",
         authority="interpret",
     ),
+    ChildSpec(
+        name="repo",
+        command=[sys.executable, "-m", "cortex.service_server", "repo"],
+        restart="on-failure",
+        authority="act_reversible",
+    ),
 ]
 
 

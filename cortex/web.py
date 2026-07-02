@@ -14,6 +14,7 @@ from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
 from cortex.planner import PlannerService
+from cortex.repo_service import RepoService
 from cortex.sacred import ANTI_IDOLATRY
 from cortex.self_train import SelfTrainer
 from cortex.services import InvocationPipeline
@@ -89,6 +90,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, ImmuneService(ROOT).report())
         elif self.path == "/immune/memory":
             self._json(200, {"status": "ok", "records": ImmuneService(ROOT).memory_records()})
+        elif self.path == "/repo/status":
+            self._json(200, RepoService(ROOT).status())
+        elif self.path == "/repo/diff":
+            self._json(200, RepoService(ROOT).diff())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -98,7 +103,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -163,6 +168,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, ImmuneService(ROOT).scan(payload))
         elif self.path == "/immune/quarantine":
             self._json(200, ImmuneService(ROOT).quarantine(str(payload.get("reason", "manual quarantine")), str(payload.get("source", "manual")), payload.get("witness")))
+        elif self.path == "/repo/verify":
+            try:
+                result = RepoService(ROOT).verify(str(payload.get("scope", "tests")))
+                self._json(200 if result["status"] == "pass" else 500, result)
+            except Exception as exc:
+                self._json(400, {"status": "refused", "reason": str(exc), "may_execute": False})
         else:
             self._json(404, {"status": "not_found"})
 

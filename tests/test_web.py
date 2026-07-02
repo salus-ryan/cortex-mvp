@@ -12,6 +12,8 @@ from cortex.web import Handler
 def make_root(tmp_path: Path) -> Path:
     (tmp_path / "runtime").mkdir()
     (tmp_path / "ledger").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_ok.py").write_text("def test_ok():\n    assert True\n")
     (tmp_path / "LAW.md").write_text("# LAW")
     (tmp_path / "runtime" / "permissions.json").write_text(json.dumps({
         "authority_levels": {
@@ -146,6 +148,10 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["status"] == "scanned"
         code, data = get(base + "/immune/report")
         assert code == 200 and data["may_execute"] is False
+        code, data = get(base + "/repo/status")
+        assert code == 200 and data["may_execute"] is False
+        code, data = post(base + "/repo/verify", {"scope": "quick"})
+        assert code == 200 and data["status"] == "pass"
     finally:
         server.shutdown()
 

@@ -115,6 +115,9 @@ curl "$BASE/immune/report"
 
 curl "$BASE/v1/models"
 
+curl "$BASE/repo/status"
+curl -X POST "$BASE/repo/verify" -H 'content-type: application/json' -d '{"scope":"quick"}'
+
 curl -X POST "$BASE/v1/chat/completions" \
   -H 'content-type: application/json' \
   -d '{"model":"cortex-local-mind-v1","messages":[{"role":"user","content":"what binds Cortex?"}]}'
@@ -231,10 +234,11 @@ The system has two connected strata.
 9. **Deliberation (`cortex.deliberation`)**: Local multi-step reasoning loop: evidence, specialists, Guardian, Prophet, scored recommendations; never executes.
 10. **Immune (`cortex.immune`)**: Artificial immune system for antigen detection, quarantine recommendations, immune memory, and rejected-memory records.
 11. **Pi Extension (`.pi/extensions/cortex.ts`)**: Lets Pi use Cortex as an immune/governance layer and registers Cortex as an OpenAI-compatible local provider.
-12. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
-13. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
-14. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-15. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+12. **Repo Verifier (`cortex.repo_service`)**: Grounded repo status, diff, and allowlisted pytest verification loop.
+13. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
+14. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
+15. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+16. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -252,6 +256,7 @@ cortex/
 ├── memory_service.py    # Typed sourced JSONL memory service
 ├── oracle.py            # Oracle adapter; local by default, rented optional, inference only
 ├── planner.py           # Self-organization planner; chooses but does not execute
+├── repo_service.py      # Repo status, diff, and allowlisted verification
 ├── pid1.py              # Literal container PID-1 supervisor
 ├── policy.py            # Authority and safety gatekeeper
 ├── prophet.py           # Drift/law evaluator service
@@ -301,6 +306,7 @@ python -m pytest \
   tests/test_oracle.py \
   tests/test_pid1.py \
   tests/test_prophet.py \
+  tests/test_repo_service.py \
   tests/test_self_train.py \
   tests/test_services.py \
   tests/test_web.py -q
