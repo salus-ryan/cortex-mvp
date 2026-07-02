@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from cortex.oracle import OracleService
 from cortex.sacred import ANTI_IDOLATRY
 
 
@@ -105,15 +106,26 @@ class InvocationPipeline:
             return {"status": "refused", "reason": result.reason, "law": result.law, "anti_idolatry": ANTI_IDOLATRY, "record": refusal}
 
         record = self.scribe.append("actions.jsonl", {**base, "action_type": "invoke", "status": "accepted"})
-        # MVP oracle: no model authority; return a lawful acknowledgement.
+        oracle = OracleService(self.root).propose(task, authority, {"tools": tools, "witness": witness})
+        oracle_record = self.scribe.append(
+            "actions.jsonl",
+            {
+                **base,
+                "action_type": "oracle_proposal",
+                "status": "proposed",
+                "oracle": oracle.to_dict(),
+            },
+        )
         return {
             "status": "accepted",
             "task": task,
             "authority_level": authority,
             "guardian": result.reason,
-            "response": "Invocation accepted under law. No material action executed beyond ledger witness.",
+            "oracle": oracle.to_dict(),
+            "response": oracle.proposal,
             "anti_idolatry": ANTI_IDOLATRY,
             "record": record,
+            "oracle_record": oracle_record,
         }
 
     def self_test(self) -> dict[str, Any]:

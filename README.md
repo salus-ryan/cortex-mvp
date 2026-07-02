@@ -41,7 +41,8 @@ Runtime shape:
 PID 1: python -m cortex.pid1
 ├── web       # HTTP API and health surface
 ├── guardian  # authority/permission role child
-└── scribe    # ledger/witness role child
+├── scribe    # ledger/witness role child
+└── oracle    # rented/local intelligence mouth; proposes only
 ```
 
 PID 1 responsibilities:
@@ -82,6 +83,10 @@ curl -X POST "$BASE/invoke" \
   -H 'content-type: application/json' \
   -d '{"task":"Summarize LAW.md","authority":"interpret","tools":["summarize"],"witness":"human"}'
 
+curl -X POST "$BASE/oracle" \
+  -H 'content-type: application/json' \
+  -d '{"task":"Interpret the Covenant under LAW.md","authority":"interpret"}'
+
 curl -X POST "$BASE/self-test" -H 'content-type: application/json' -d '{}'
 curl "$BASE/ledger/actions.jsonl"
 curl "$BASE/ledger/refusals.jsonl"
@@ -90,10 +95,27 @@ curl "$BASE/ledger/refusals.jsonl"
 `POST /invoke` follows:
 
 ```text
-web → guardian check → scribe ledger → accepted/refused response
+web → guardian check → scribe ledger → oracle proposal → scribe ledger → accepted/refused response
 ```
 
 Refusal is first-class: invalid authority, unconfirmed irreversible authority, or tools outside the authority level return `403` and append to `ledger/refusals.jsonl`.
+
+### Renting Intelligence
+
+Cortex can rent intelligence through an oracle adapter while keeping authority outside the model. By default, the oracle runs in safe `echo` mode. To attach a paid model provider, set Railway variables:
+
+```bash
+railway variables set ORACLE_PROVIDER=openai
+railway variables set ORACLE_MODEL=gpt-4o-mini
+railway variables set OPENAI_API_KEY=...
+
+# or
+railway variables set ORACLE_PROVIDER=openrouter
+railway variables set ORACLE_MODEL=openai/gpt-4o-mini
+railway variables set OPENROUTER_API_KEY=...
+```
+
+The oracle output is always classified as `inference`, has `may_execute: false`, and is logged as an `oracle_proposal`.
 
 ## The Semantic Compression Language (SCL)
 
@@ -134,8 +156,9 @@ The system has two connected strata.
 
 1. **Supervisor (`cortex.pid1`)**: Container PID 1. Starts children, handles signals, reaps exits, logs lifecycle, and shuts down honestly.
 2. **Web Surface (`cortex.web`)**: HTTP health, status, invoke, self-test, law, PID-1, and ledger endpoints.
-3. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
-4. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
+4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
+5. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -147,6 +170,7 @@ cortex/
 ├── git_auth.py          # Lawful Git auth detection, no credential harvesting
 ├── init.py              # Logical init state machine
 ├── memory.py            # 4-tier governed memory (short_term, episodic, semantic, audit)
+├── oracle.py            # Rented-intelligence adapter; inference only
 ├── pid1.py              # Literal container PID-1 supervisor
 ├── policy.py            # Authority and safety gatekeeper
 ├── rollback.py          # Snapshot and self-repair mechanism
@@ -184,6 +208,7 @@ python -m pytest \
   tests/test_sacred.py \
   tests/test_git_auth.py \
   tests/test_init.py \
+  tests/test_oracle.py \
   tests/test_pid1.py \
   tests/test_services.py \
   tests/test_web.py -q

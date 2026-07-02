@@ -10,6 +10,7 @@ from typing import Any
 
 from cortex.init import CortexInit
 from cortex.sacred import ANTI_IDOLATRY
+from cortex.oracle import OracleService
 from cortex.services import InvocationPipeline, ScribeService
 
 ROOT = Path(os.environ.get("CORTEX_ROOT", os.getcwd())).resolve()
@@ -66,6 +67,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/invoke":
             result = pipeline.invoke(payload)
             self._json(200 if result["status"] == "accepted" else 403, result)
+        elif self.path == "/oracle":
+            task = str(payload.get("task", "")).strip()
+            if not task:
+                self._json(400, {"status": "bad_request", "reason": "task is required"})
+            else:
+                result = OracleService(ROOT).propose(task, str(payload.get("authority", "interpret")), payload.get("context", {}))
+                ScribeService(ROOT).append("actions.jsonl", {"actor": "web.oracle", "action_type": "oracle_proposal", "status": "proposed", "oracle": result.to_dict()})
+                self._json(200, result.to_dict())
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)

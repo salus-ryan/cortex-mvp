@@ -37,6 +37,8 @@ def test_invocation_pipeline_logs_acceptance_and_refusal(tmp_path):
     pipeline = InvocationPipeline(root)
     accepted = pipeline.invoke({"task": "read law", "authority": "interpret", "tools": ["summarize"], "witness": "tester"})
     assert accepted["status"] == "accepted"
+    assert accepted["oracle"]["classification"] == "inference"
+    assert accepted["oracle"]["may_execute"] is False
 
     refused = pipeline.invoke({"task": "mutate", "authority": "interpret", "tools": ["write_workspace"]})
     assert refused["status"] == "refused"

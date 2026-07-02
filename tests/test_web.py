@@ -54,7 +54,9 @@ def test_web_invoke_accepts_and_ledger(monkeypatch, tmp_path):
         assert data["status"] == "accepted"
         code, ledger = get(base + "/ledger/actions.jsonl")
         assert code == 200
-        assert ledger["records"][-1]["action_type"] == "invoke"
+        actions = [r["action_type"] for r in ledger["records"]]
+        assert "invoke" in actions
+        assert "oracle_proposal" in actions
     finally:
         server.shutdown()
 
@@ -74,6 +76,17 @@ def test_web_invoke_refuses(monkeypatch, tmp_path):
             assert exc.code == 403
             data = json.loads(exc.read().decode())
             assert data["status"] == "refused"
+    finally:
+        server.shutdown()
+
+
+def test_web_oracle(monkeypatch, tmp_path):
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        code, data = post(base + "/oracle", {"task": "interpret", "authority": "interpret"})
+        assert code == 200
+        assert data["status"] == "proposed"
+        assert data["may_execute"] is False
     finally:
         server.shutdown()
 

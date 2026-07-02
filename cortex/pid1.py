@@ -68,6 +68,12 @@ DEFAULT_CHILDREN = [
         restart="never",
         authority="observe",
     ),
+    ChildSpec(
+        name="oracle",
+        command=[sys.executable, "-m", "cortex.pid1", "child", "oracle"],
+        restart="never",
+        authority="interpret",
+    ),
 ]
 
 
