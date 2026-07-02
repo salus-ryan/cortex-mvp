@@ -117,6 +117,7 @@ curl "$BASE/v1/models"
 
 curl "$BASE/repo/status"
 curl -X POST "$BASE/repo/verify" -H 'content-type: application/json' -d '{"scope":"quick"}'
+curl -X POST "$BASE/patch/check" -H 'content-type: application/json' -d '{"patch":"diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n"}'
 
 curl -X POST "$BASE/v1/chat/completions" \
   -H 'content-type: application/json' \
@@ -235,10 +236,11 @@ The system has two connected strata.
 10. **Immune (`cortex.immune`)**: Artificial immune system for antigen detection, quarantine recommendations, immune memory, and rejected-memory records.
 11. **Pi Extension (`.pi/extensions/cortex.ts`)**: Lets Pi use Cortex as an immune/governance layer and registers Cortex as an OpenAI-compatible local provider.
 12. **Repo Verifier (`cortex.repo_service`)**: Grounded repo status, diff, and allowlisted pytest verification loop.
-13. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
-14. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
-15. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-16. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+13. **Patch Service (`cortex.patch_service`)**: Validates and applies reversible unified diffs only with witness and confirmation.
+14. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
+15. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
+16. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+17. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -255,6 +257,7 @@ cortex/
 ├── local_mind.py        # Local non-rented retrieval/synthesis cognition
 ├── memory_service.py    # Typed sourced JSONL memory service
 ├── oracle.py            # Oracle adapter; local by default, rented optional, inference only
+├── patch_service.py     # Governed reversible patch validation/application
 ├── planner.py           # Self-organization planner; chooses but does not execute
 ├── repo_service.py      # Repo status, diff, and allowlisted verification
 ├── pid1.py              # Literal container PID-1 supervisor
@@ -304,6 +307,7 @@ python -m pytest \
   tests/test_local_mind.py \
   tests/test_missing_pieces.py \
   tests/test_oracle.py \
+  tests/test_patch_service.py \
   tests/test_pid1.py \
   tests/test_prophet.py \
   tests/test_repo_service.py \

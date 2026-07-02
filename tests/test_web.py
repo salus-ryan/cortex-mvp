@@ -152,6 +152,8 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["may_execute"] is False
         code, data = post(base + "/repo/verify", {"scope": "quick"})
         assert code == 200 and data["status"] == "pass"
+        code, data = post(base + "/patch/check", {"patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n"})
+        assert code == 200 and data["status"] == "checked"
     finally:
         server.shutdown()
 

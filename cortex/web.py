@@ -13,6 +13,7 @@ from cortex.immune import ImmuneService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
+from cortex.patch_service import PatchService
 from cortex.planner import PlannerService
 from cortex.repo_service import RepoService
 from cortex.sacred import ANTI_IDOLATRY
@@ -94,6 +95,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, RepoService(ROOT).status())
         elif self.path == "/repo/diff":
             self._json(200, RepoService(ROOT).diff())
+        elif self.path == "/patch/latest":
+            self._json(200, PatchService(ROOT).latest())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -103,7 +106,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -174,6 +177,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200 if result["status"] == "pass" else 500, result)
             except Exception as exc:
                 self._json(400, {"status": "refused", "reason": str(exc), "may_execute": False})
+        elif self.path == "/patch/check":
+            self._json(200, PatchService(ROOT).check(str(payload.get("patch", ""))))
+        elif self.path == "/patch/apply":
+            result = PatchService(ROOT).apply(str(payload.get("patch", "")), payload.get("witness"), bool(payload.get("confirmed", False)))
+            self._json(200 if result["status"] == "applied" else 403, result)
         else:
             self._json(404, {"status": "not_found"})
 
