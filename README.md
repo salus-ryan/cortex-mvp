@@ -122,6 +122,8 @@ curl -X POST "$BASE/build/propose" -H 'content-type: application/json' -d '{"tas
 curl "$BASE/build/report"
 curl "$BASE/deploy/status"
 curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
+# Self-owned Forge deploys require a host with Docker plus witness/confirmation.
+# curl -X POST "$BASE/deploy/forge" -H 'content-type: application/json' -d '{"witness":"human","confirmed":true}'
 
 curl -X POST "$BASE/v1/chat/completions" \
   -H 'content-type: application/json' \
@@ -242,7 +244,7 @@ The system has two connected strata.
 12. **Repo Verifier (`cortex.repo_service`)**: Grounded repo status, diff, and allowlisted pytest verification loop.
 13. **Patch Service (`cortex.patch_service`)**: Validates and applies reversible unified diffs only with witness and confirmation.
 14. **Build Loop (`cortex.build_loop`)**: Orchestrates propose → check → witness apply → verify → report.
-15. **Deploy Service (`cortex.deploy_service`)**: Witness-gated Railway deploy preflight and allowlisted deploy command.
+15. **Deploy Service (`cortex.deploy_service`)**: Witness-gated Railway and Cortex Forge deploy preflight/allowlisted commands.
 16. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
 17. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
 18. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
@@ -260,7 +262,7 @@ cortex/
 ├── memory.py            # 4-tier governed runtime memory (short_term, episodic, semantic, audit)
 ├── build_loop.py        # Governed build-loop orchestration
 ├── deliberation.py      # Multi-step local recommendation engine
-├── deploy_service.py    # Witness-gated Railway deployment organ
+├── deploy_service.py    # Witness-gated Railway/Cortex Forge deployment organ
 ├── immune.py            # Artificial immune system and quarantine memory
 ├── local_mind.py        # Local non-rented retrieval/synthesis cognition
 ├── memory_service.py    # Typed sourced JSONL memory service
@@ -287,6 +289,7 @@ cortex/
 └── witness.py           # Witness/governance ledger primitives
 canon/                   # Canonical grammar and roles
 evals/                   # Law, drift, refusal, and identity tests
+forge/                   # Minimal self-owned PaaS scripts
 ledger/                  # Append-only JSONL witness streams
 runtime/                 # Permissions and runtime state
 scripts/                 # Data generation, chat, e2e, training utilities

@@ -1,0 +1,12 @@
+# Example Caddy config for Cortex Forge.
+# Replace cortex.example.com with your domain.
+
+cortex.example.com {
+	reverse_proxy 127.0.0.1:8080
+
+	header {
+		# Basic hardening; tune for your needs.
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+}

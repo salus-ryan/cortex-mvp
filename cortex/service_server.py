@@ -198,6 +198,10 @@ class RoleHandler(BaseHTTPRequestHandler):
             result = DeployService(self.root).railway(payload.get("witness"), bool(payload.get("confirmed", False)), payload.get("expected_commit"), payload.get("public_url"))
             _json_response(self, 200 if result["status"] == "deployed" else 403, result)
             return
+        if self.role == "deploy" and self.path == "/forge":
+            result = DeployService(self.root).forge(payload.get("witness"), bool(payload.get("confirmed", False)), payload.get("public_url"))
+            _json_response(self, 200 if result["status"] == "deployed" else 403, result)
+            return
 
         _json_response(self, 404, {"status": "not_found", "role": self.role})
 

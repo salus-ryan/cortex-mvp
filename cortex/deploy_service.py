@@ -23,6 +23,7 @@ from cortex.repo_service import RepoService
 
 class DeployService:
     COMMAND = ["railway", "up", "-y", "--detach", "--json"]
+    FORGE_COMMAND = ["forge/deploy.sh"]
 
     def __init__(self, root: Path | str = ".") -> None:
         self.root = Path(root).resolve()
@@ -40,6 +41,7 @@ class DeployService:
             "timestamp": self.now(),
             "railway_available": shutil.which("railway") is not None,
             "railway_token_present": self._railway_token_present(),
+            "forge_available": (self.root / "forge" / "deploy.sh").exists(),
             "latest": self.report(),
             "may_execute": False,
         }
@@ -81,6 +83,42 @@ class DeployService:
             "statement": "Deploy preflight checks deployment readiness only; it does not deploy.",
         }
         self._record("check", report)
+        return report
+
+    def forge(self, witness: str | None, confirmed: bool = False, public_url: str | None = None) -> dict[str, Any]:
+        if not witness:
+            return self._refuse("forge deployment requires witness")
+        if not confirmed:
+            return self._refuse("forge deployment requires confirmed=true")
+        script = self.root / "forge" / "deploy.sh"
+        if not script.exists():
+            return self._refuse("forge deploy script unavailable")
+        env = os.environ.copy()
+        env["WITNESS"] = witness
+        env["CONFIRMED"] = "true"
+        if public_url:
+            env["PUBLIC_URL"] = public_url
+        proc = subprocess.run([str(script)], cwd=self.root, text=True, capture_output=True, timeout=600, env=env)
+        deployment: dict[str, Any] = {}
+        if proc.stdout.strip():
+            try:
+                deployment = json.loads(proc.stdout.splitlines()[0])
+            except Exception:
+                deployment = {"raw_stdout": proc.stdout[-4000:]}
+        report = {
+            "status": "deployed" if proc.returncode == 0 else "failed",
+            "timestamp": self.now(),
+            "command": self.FORGE_COMMAND,
+            "returncode": proc.returncode,
+            "stdout": proc.stdout[-4000:],
+            "stderr": proc.stderr[-4000:],
+            "deployment": deployment,
+            "witness": witness,
+            "confirmed": confirmed,
+            "may_execute": False,
+            "statement": "Only the allowlisted Cortex Forge deploy script was run after witness and confirmation.",
+        }
+        self._record("forge", report)
         return report
 
     def railway(self, witness: str | None, confirmed: bool = False, expected_commit: str | None = None, public_url: str | None = None) -> dict[str, Any]:

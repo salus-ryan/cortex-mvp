@@ -162,6 +162,11 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["may_execute"] is False
         code, data = post(base + "/deploy/check", {})
         assert code == 200 and data["status"] in {"pass", "blocked"}
+        req = urllib.request.Request(base + "/deploy/forge", data=json.dumps({"confirmed": True}).encode(), headers={"content-type": "application/json"}, method="POST")
+        try:
+            urllib.request.urlopen(req, timeout=5)
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403
     finally:
         server.shutdown()
 

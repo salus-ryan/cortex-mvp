@@ -36,6 +36,40 @@ def test_deploy_requires_witness_and_confirmation(tmp_path):
     assert svc.railway("alice", False)["status"] == "refused"
 
 
+def test_deploy_forge_requires_witness(tmp_path):
+    svc = DeployService(make_root(tmp_path))
+    assert svc.forge(None, True)["status"] == "refused"
+    assert svc.forge("alice", False)["status"] == "refused"
+
+
+def test_deploy_forge_allowlisted_script(tmp_path, monkeypatch):
+    root = make_root(tmp_path)
+    (root / "forge").mkdir()
+    (root / "forge" / "deploy.sh").write_text("#!/usr/bin/env bash\necho '{\"status\":\"deployed\"}'\n")
+    (root / "forge" / "deploy.sh").chmod(0o755)
+
+    class Proc:
+        returncode = 0
+        stdout = '{"status":"deployed"}\nforge deploy: pass\n'
+        stderr = ""
+
+    calls = []
+    real_run = subprocess.run
+
+    def fake_run(cmd, **kwargs):
+        if str(cmd[0]).endswith("forge/deploy.sh"):
+            calls.append(cmd)
+            assert kwargs["env"]["WITNESS"] == "alice"
+            assert kwargs["env"]["CONFIRMED"] == "true"
+            return Proc()
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    report = DeployService(root).forge("alice", True)
+    assert report["status"] == "deployed"
+    assert calls and str(calls[0][0]).endswith("forge/deploy.sh")
+
+
 def test_deploy_railway_allowlisted_command(tmp_path, monkeypatch):
     root = make_root(tmp_path)
     monkeypatch.setenv("RAILWAY_TOKEN", "test-token")

@@ -205,6 +205,9 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/deploy/railway":
             result = DeployService(ROOT).railway(payload.get("witness"), bool(payload.get("confirmed", False)), payload.get("expected_commit"), payload.get("public_url"))
             self._json(200 if result["status"] == "deployed" else 403, result)
+        elif self.path == "/deploy/forge":
+            result = DeployService(ROOT).forge(payload.get("witness"), bool(payload.get("confirmed", False)), payload.get("public_url"))
+            self._json(200 if result["status"] == "deployed" else 403, result)
         else:
             self._json(404, {"status": "not_found"})
 
