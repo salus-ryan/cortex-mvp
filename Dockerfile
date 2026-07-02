@@ -6,4 +6,4 @@ COPY . /app
 ENV PYTHONUNBUFFERED=1
 ENV CORTEX_ROOT=/app
 
-CMD ["python", "-m", "cortex.web"]
+ENTRYPOINT ["python", "-m", "cortex.pid1"]

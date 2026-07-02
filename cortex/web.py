@@ -32,6 +32,12 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/law":
             law = ROOT / "LAW.md"
             self._json(200, {"law": law.read_text() if law.exists() else "LAW.md missing"})
+        elif self.path == "/pid1":
+            status = ROOT / "runtime" / "pid1.json"
+            if status.exists():
+                self._json(200, json.loads(status.read_text()))
+            else:
+                self._json(503, {"status": "pid1_status_missing"})
         else:
             self._json(404, {"status": "not_found"})
 
