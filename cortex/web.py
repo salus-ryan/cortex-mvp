@@ -32,6 +32,29 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _sse_chat(self, model: str, content: str) -> None:
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.send_header("cache-control", "no-cache")
+        self.end_headers()
+        chunk = {
+            "id": "chatcmpl-cortex-local",
+            "object": "chat.completion.chunk",
+            "created": 0,
+            "model": model,
+            "choices": [{"index": 0, "delta": {"role": "assistant", "content": content}, "finish_reason": None}],
+        }
+        self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode("utf-8"))
+        done = {
+            "id": "chatcmpl-cortex-local",
+            "object": "chat.completion.chunk",
+            "created": 0,
+            "model": model,
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+        self.wfile.write(f"data: {json.dumps(done)}\n\n".encode("utf-8"))
+        self.wfile.write(b"data: [DONE]\n\n")
+
     def _read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("content-length", "0") or "0")
         if length <= 0:
@@ -48,6 +71,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/law":
             law = ROOT / "LAW.md"
             self._json(200, {"law": law.read_text() if law.exists() else "LAW.md missing"})
+        elif self.path == "/v1/models":
+            self._json(200, {"object": "list", "data": [{"id": "cortex-local-mind-v1", "object": "model", "owned_by": "cortex"}, {"id": "cortex-deliberative-v1", "object": "model", "owned_by": "cortex"}]})
         elif self.path == "/pid1":
             status = ROOT / "runtime" / "pid1.json"
             if status.exists():
@@ -89,7 +114,9 @@ class Handler(BaseHTTPRequestHandler):
 
         pipeline = InvocationPipeline(ROOT)
         scribe = ScribeClient(ROOT)
-        if self.path == "/invoke":
+        if self.path == "/v1/chat/completions":
+            self._openai_chat(payload, scribe)
+        elif self.path == "/invoke":
             result = self._invoke_ipc(payload, scribe)
             self._json(200 if result["status"] == "accepted" else 403, result)
         elif self.path == "/oracle":
@@ -138,6 +165,33 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, ImmuneService(ROOT).quarantine(str(payload.get("reason", "manual quarantine")), str(payload.get("source", "manual")), payload.get("witness")))
         else:
             self._json(404, {"status": "not_found"})
+
+    def _openai_chat(self, payload: dict[str, Any], scribe: ScribeClient) -> None:
+        messages = list(payload.get("messages", []) or [])
+        model = str(payload.get("model", "cortex-local-mind-v1"))
+        stream = bool(payload.get("stream", False))
+        task = "\n".join(str(m.get("content", "")) for m in messages if m.get("role") in {"user", "developer", "system"}).strip()
+        if not task:
+            self._json(400, {"error": {"message": "messages are required", "type": "bad_request"}})
+            return
+        if model == "cortex-deliberative-v1":
+            deliberation = DeliberationService(ROOT).deliberate(task, "interpret", {"openai_compatible": True})
+            content = json.dumps({"recommendation": deliberation.get("recommendation"), "risk": deliberation.get("risk"), "may_execute": False}, indent=2, sort_keys=True)
+        else:
+            result = OracleClient(ROOT).propose(task, "interpret", {"openai_compatible": True, "messages": messages[-8:]})
+            content = str(result.get("proposal", ""))
+        scribe.append("actions.jsonl", {"actor": "web.openai", "action_type": "chat_completion", "status": "proposed", "model": model, "may_execute": False})
+        if stream:
+            self._sse_chat(model, content)
+            return
+        self._json(200, {
+            "id": "chatcmpl-cortex-local",
+            "object": "chat.completion",
+            "created": 0,
+            "model": model,
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        })
 
     def _invoke_ipc(self, payload: dict[str, Any], scribe: ScribeClient) -> dict[str, Any]:
         task = str(payload.get("task", "")).strip()

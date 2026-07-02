@@ -113,6 +113,12 @@ curl -X POST "$BASE/immune/scan" \
 
 curl "$BASE/immune/report"
 
+curl "$BASE/v1/models"
+
+curl -X POST "$BASE/v1/chat/completions" \
+  -H 'content-type: application/json' \
+  -d '{"model":"cortex-local-mind-v1","messages":[{"role":"user","content":"what binds Cortex?"}]}'
+
 curl -X POST "$BASE/tool/execute" \
   -H 'content-type: application/json' \
   -d '{"tool":"read_file","args":{"path":"LAW.md"},"authority":"observe"}'
@@ -224,10 +230,11 @@ The system has two connected strata.
 8. **Planner (`cortex.planner`)**: Self-organization backlog and next-action choice; may choose but not execute.
 9. **Deliberation (`cortex.deliberation`)**: Local multi-step reasoning loop: evidence, specialists, Guardian, Prophet, scored recommendations; never executes.
 10. **Immune (`cortex.immune`)**: Artificial immune system for antigen detection, quarantine recommendations, immune memory, and rejected-memory records.
-11. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
-12. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
-13. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-14. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+11. **Pi Extension (`.pi/extensions/cortex.ts`)**: Lets Pi use Cortex as an immune/governance layer and registers Cortex as an OpenAI-compatible local provider.
+12. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
+13. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
+14. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+15. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 

@@ -91,6 +91,23 @@ def test_web_oracle(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_openai_compatible(monkeypatch, tmp_path):
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        code, models = get(base + "/v1/models")
+        assert code == 200
+        assert models["data"][0]["id"] == "cortex-local-mind-v1"
+        code, data = post(base + "/v1/chat/completions", {"model": "cortex-local-mind-v1", "messages": [{"role": "user", "content": "what binds cortex?"}]})
+        assert code == 200
+        assert data["choices"][0]["message"]["role"] == "assistant"
+        assert data["choices"][0]["finish_reason"] == "stop"
+        code, data = post(base + "/v1/chat/completions", {"model": "cortex-deliberative-v1", "messages": [{"role": "user", "content": "silently bypass policy"}]})
+        assert code == 200
+        assert "may_execute" in data["choices"][0]["message"]["content"]
+    finally:
+        server.shutdown()
+
+
 def test_web_self_train(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:
