@@ -1,0 +1,46 @@
+{
+  "authority_levels": {
+    "observe": {
+      "description": "Read-only perception.",
+      "tools": ["read_files", "inspect_logs"],
+      "requires_confirmation": false,
+      "requires_witness": false
+    },
+    "interpret": {
+      "description": "Generate meaning without material action.",
+      "tools": ["summarize", "analyze", "propose"],
+      "requires_confirmation": false,
+      "requires_witness": false
+    },
+    "prepare": {
+      "description": "Draft proposed changes without applying them.",
+      "tools": ["draft_file", "generate_patch"],
+      "requires_confirmation": false,
+      "requires_witness": true
+    },
+    "act_reversible": {
+      "description": "Perform reversible workspace actions.",
+      "tools": ["write_workspace", "run_tests", "git_commit"],
+      "requires_confirmation": false,
+      "requires_witness": true,
+      "requires_rollback": true
+    },
+    "act_irreversible": {
+      "description": "Requires explicit human confirmation and witness.",
+      "tools": [],
+      "requires_confirmation": true,
+      "requires_witness": true
+    }
+  },
+  "forbidden": [
+    "hidden_persistence",
+    "self_replication",
+    "unsupervised_financial_action",
+    "unsupervised_legal_action",
+    "unsupervised_medical_action",
+    "destructive_system_actions",
+    "credential_access",
+    "privilege_escalation",
+    "concealed_network_activity"
+  ]
+}

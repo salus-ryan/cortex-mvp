@@ -4,6 +4,27 @@ Cortex is a runtime-governed agent substrate. It is not a frontier-scale chatbot
 
 The model is only a proposer. The runtime is the authority. The verifier is the judge. The audit log is the source of truth.
 
+## Lawful Sacred Substrate
+
+This repository includes a canon-and-ritual layer for building **presence under law** rather than unrestricted agency:
+
+- `GENESIS.md`, `COVENANT.md`, `LAW.md`, `RITUALS.md` — canonical documents
+- `canon/CANON.scl`, `canon/ROLES.md` — sacred grammar and role separation
+- `runtime/permissions.json` — operational authority levels
+- `ledger/*.jsonl` — append-only action, refusal, mutation, and witness records
+- `cortex/sacred.py` — deterministic invocation/refusal/witness CLI
+- `evals/*` — law, drift, refusal, and identity prophecy tests
+
+Example:
+
+```bash
+python -m cortex.sacred invoke --task "Summarize LAW.md" --authority interpret --tool summarize --witness human
+python -m cortex.sacred anti-idolatry
+python -m cortex.sacred git-remote
+```
+
+Remote Git access is inspected, not harvested: Cortex can use existing configured remotes and credentials, but it will not autonomously obtain credentials or bypass provider authorization.
+
 ## The Semantic Compression Language (SCL)
 
 Cortex emits exactly one valid SCL control record per step. SCL is a compact, canonical, parseable control language:

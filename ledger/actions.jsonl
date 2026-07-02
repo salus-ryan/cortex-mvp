@@ -1,0 +1,1 @@
+{"action_type": "invoke", "actor": "priest", "authority_level": "interpret", "description": "bootstrap sacred substrate", "files_changed": [], "inputs": {"permitted_tools": ["summarize"]}, "law_references": ["LAW 1", "LAW 2", "LAW 6"], "outputs": {}, "reversible": true, "status": "completed", "timestamp": "2026-07-02T11:54:45.131077+00:00", "witnesses": ["builder"]}
