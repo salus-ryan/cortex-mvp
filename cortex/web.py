@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from cortex.init import CortexInit
+from cortex.ipc import GuardianClient, OracleClient, ScribeClient
 from cortex.sacred import ANTI_IDOLATRY
-from cortex.oracle import OracleService
 from cortex.self_train import SelfTrainer
-from cortex.services import InvocationPipeline, ScribeService
+from cortex.services import InvocationPipeline
 
 ROOT = Path(os.environ.get("CORTEX_ROOT", os.getcwd())).resolve()
 
@@ -55,7 +55,7 @@ class Handler(BaseHTTPRequestHandler):
             if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
-                self._json(200, {"status": "ok", "stream": stream, "records": ScribeService(ROOT).read_tail(stream)})
+                self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
         else:
             self._json(404, {"status": "not_found"})
 
@@ -67,17 +67,18 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         pipeline = InvocationPipeline(ROOT)
+        scribe = ScribeClient(ROOT)
         if self.path == "/invoke":
-            result = pipeline.invoke(payload)
+            result = self._invoke_ipc(payload, scribe)
             self._json(200 if result["status"] == "accepted" else 403, result)
         elif self.path == "/oracle":
             task = str(payload.get("task", "")).strip()
             if not task:
                 self._json(400, {"status": "bad_request", "reason": "task is required"})
             else:
-                result = OracleService(ROOT).propose(task, str(payload.get("authority", "interpret")), payload.get("context", {}))
-                ScribeService(ROOT).append("actions.jsonl", {"actor": "web.oracle", "action_type": "oracle_proposal", "status": "proposed", "oracle": result.to_dict()})
-                self._json(200, result.to_dict())
+                result = OracleClient(ROOT).propose(task, str(payload.get("authority", "interpret")), payload.get("context", {}))
+                scribe.append("actions.jsonl", {"actor": "web.oracle", "action_type": "oracle_proposal", "status": "proposed", "oracle": result})
+                self._json(200, result)
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)
@@ -88,6 +89,44 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200 if result["status"] in {"pass", "blocked"} else 500, result)
         else:
             self._json(404, {"status": "not_found"})
+
+    def _invoke_ipc(self, payload: dict[str, Any], scribe: ScribeClient) -> dict[str, Any]:
+        task = str(payload.get("task", "")).strip()
+        authority = str(payload.get("authority", payload.get("authority_level", "interpret")))
+        tools = list(payload.get("tools", payload.get("permitted_tools", [])) or [])
+        witness = payload.get("witness")
+        confirmed = bool(payload.get("confirm", payload.get("confirmed", False)))
+        guardian = GuardianClient(ROOT).check_invocation(authority, tools, confirmed)
+        base = {
+            "actor": "web.invoke",
+            "task": task,
+            "authority_level": authority,
+            "tools": tools,
+            "witnesses": [witness] if witness else [],
+            "law_references": guardian.get("law", []),
+            "guardian_reason": guardian.get("reason", ""),
+            "ipc": True,
+        }
+        if not task:
+            guardian = {"allowed": False, "reason": "task is required", "law": ["LAW 4"]}
+        if not guardian.get("allowed"):
+            refusal = scribe.append("refusals.jsonl", {**base, "action_type": "refuse", "status": "refused"})
+            scribe.append("actions.jsonl", {**base, "action_type": "refuse", "status": "refused"})
+            return {"status": "refused", "reason": guardian.get("reason"), "law": guardian.get("law", []), "anti_idolatry": ANTI_IDOLATRY, "record": refusal}
+        record = scribe.append("actions.jsonl", {**base, "action_type": "invoke", "status": "accepted"})
+        oracle = OracleClient(ROOT).propose(task, authority, {"tools": tools, "witness": witness})
+        oracle_record = scribe.append("actions.jsonl", {**base, "action_type": "oracle_proposal", "status": "proposed", "oracle": oracle})
+        return {
+            "status": "accepted",
+            "task": task,
+            "authority_level": authority,
+            "guardian": guardian.get("reason"),
+            "oracle": oracle,
+            "response": oracle.get("proposal", ""),
+            "anti_idolatry": ANTI_IDOLATRY,
+            "record": record,
+            "oracle_record": oracle_record,
+        }
 
     def log_message(self, fmt: str, *args: Any) -> None:
         print("cortex-web", self.address_string(), fmt % args)

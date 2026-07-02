@@ -58,20 +58,20 @@ DEFAULT_CHILDREN = [
     ),
     ChildSpec(
         name="guardian",
-        command=[sys.executable, "-m", "cortex.pid1", "child", "guardian"],
-        restart="never",
+        command=[sys.executable, "-m", "cortex.service_server", "guardian"],
+        restart="on-failure",
         authority="observe",
     ),
     ChildSpec(
         name="scribe",
-        command=[sys.executable, "-m", "cortex.pid1", "child", "scribe"],
-        restart="never",
+        command=[sys.executable, "-m", "cortex.service_server", "scribe"],
+        restart="on-failure",
         authority="observe",
     ),
     ChildSpec(
         name="oracle",
-        command=[sys.executable, "-m", "cortex.pid1", "child", "oracle"],
-        restart="never",
+        command=[sys.executable, "-m", "cortex.service_server", "oracle"],
+        restart="on-failure",
         authority="interpret",
     ),
 ]
