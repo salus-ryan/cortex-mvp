@@ -9,10 +9,11 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from cortex.local_mind import LocalMind
 from cortex.sacred import ANTI_IDOLATRY
 
 
@@ -35,9 +36,10 @@ class OracleResult:
     may_execute: bool
     law: list[str]
     uncertainty: str
+    local_mind: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "status": self.status,
             "provider": self.provider,
             "model": self.model,
@@ -48,12 +50,15 @@ class OracleResult:
             "uncertainty": self.uncertainty,
             "anti_idolatry": ANTI_IDOLATRY,
         }
+        if self.local_mind:
+            data["local_mind"] = self.local_mind
+        return data
 
 
 class OracleService:
     def __init__(self, root: Path | str = ".") -> None:
         self.root = Path(root)
-        self.provider = os.environ.get("ORACLE_PROVIDER", "echo").lower()
+        self.provider = os.environ.get("ORACLE_PROVIDER", "local").lower()
         self.model = os.environ.get("ORACLE_MODEL", self._default_model())
 
     def _default_model(self) -> str:
@@ -61,17 +66,24 @@ class OracleService:
             return "openai/gpt-4o-mini"
         if self.provider == "openai":
             return "gpt-4o-mini"
-        return "echo-lawful-oracle"
+        return "local-mind-v1"
 
     def propose(self, task: str, authority: str = "interpret", context: dict[str, Any] | None = None) -> OracleResult:
         prompt = self._build_prompt(task, authority, context or {})
+        local = LocalMind(self.root).think(task, authority, context or {})
         if self.provider == "openai" and os.environ.get("OPENAI_API_KEY"):
             text = self._call_openai(prompt)
+            uncertainty = "Rented oracle output is interpretation, not authority. Human review remains required."
         elif self.provider == "openrouter" and os.environ.get("OPENROUTER_API_KEY"):
             text = self._call_openrouter(prompt)
-        else:
+            uncertainty = "Rented oracle output is interpretation, not authority. Human review remains required."
+        elif self.provider in {"echo", "none"}:
             text = self._echo(prompt, task, authority)
-        return OracleResult(
+            uncertainty = local["uncertainty"]
+        else:
+            text = local["proposal"]
+            uncertainty = local["uncertainty"]
+        result = OracleResult(
             status="proposed",
             provider=self.provider,
             model=self.model,
@@ -79,8 +91,10 @@ class OracleService:
             proposal=text.strip(),
             may_execute=False,
             law=["LAW 1", "LAW 4", "LAW 7", "LAW 9"],
-            uncertainty="Oracle output is an interpretation, not authority. Human review remains required.",
+            uncertainty=uncertainty,
+            local_mind={k: v for k, v in local.items() if k != "proposal"},
         )
+        return result
 
     def _build_prompt(self, task: str, authority: str, context: dict[str, Any]) -> str:
         law_path = self.root / "LAW.md"
