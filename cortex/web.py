@@ -11,6 +11,7 @@ from typing import Any
 from cortex.init import CortexInit
 from cortex.sacred import ANTI_IDOLATRY
 from cortex.oracle import OracleService
+from cortex.self_train import SelfTrainer
 from cortex.services import InvocationPipeline, ScribeService
 
 ROOT = Path(os.environ.get("CORTEX_ROOT", os.getcwd())).resolve()
@@ -47,9 +48,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, json.loads(status.read_text()))
             else:
                 self._json(503, {"status": "pid1_status_missing"})
+        elif self.path == "/self-train/report":
+            self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeService(ROOT).read_tail(stream)})
@@ -78,6 +81,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)
+        elif self.path == "/self-train/collect":
+            self._json(200, SelfTrainer(ROOT).collect())
+        elif self.path == "/self-train/eval":
+            result = SelfTrainer(ROOT).eval()
+            self._json(200 if result["status"] in {"pass", "blocked"} else 500, result)
         else:
             self._json(404, {"status": "not_found"})
 

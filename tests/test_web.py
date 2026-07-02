@@ -91,6 +91,23 @@ def test_web_oracle(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_self_train(monkeypatch, tmp_path):
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        post(base + "/invoke", {"task": "summarize", "authority": "interpret", "tools": ["summarize"]})
+        code, data = post(base + "/self-train/collect", {})
+        assert code == 200
+        assert data["status"] == "candidate_prepared"
+        code, data = post(base + "/self-train/eval", {})
+        assert code == 200
+        assert data["status"] == "pass"
+        code, data = get(base + "/self-train/report")
+        assert code == 200
+        assert data["promotion"] == "blocked_without_witness"
+    finally:
+        server.shutdown()
+
+
 def test_web_self_test(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:

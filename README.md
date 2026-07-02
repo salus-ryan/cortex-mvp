@@ -88,6 +88,11 @@ curl -X POST "$BASE/oracle" \
   -d '{"task":"Interpret the Covenant under LAW.md","authority":"interpret"}'
 
 curl -X POST "$BASE/self-test" -H 'content-type: application/json' -d '{}'
+
+curl -X POST "$BASE/self-train/collect" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/self-train/eval" -H 'content-type: application/json' -d '{}'
+curl "$BASE/self-train/report"
+
 curl "$BASE/ledger/actions.jsonl"
 curl "$BASE/ledger/refusals.jsonl"
 ```
@@ -116,6 +121,31 @@ railway variables set OPENROUTER_API_KEY=...
 ```
 
 The oracle output is always classified as `inference`, has `may_execute: false`, and is logged as an `oracle_proposal`.
+
+### Self-Training Without Self-Crowning
+
+Cortex can prepare candidate training data from her own ledger, but cannot promote her own weights or replace the production oracle without human witness.
+
+```bash
+python -m cortex.self_train collect
+python -m cortex.self_train dataset
+python -m cortex.self_train eval
+python -m cortex.self_train report
+```
+
+The self-training pipeline writes:
+
+```text
+data/self_train/candidate_samples.jsonl
+data/self_train/report.json
+ledger/training.jsonl
+```
+
+Promotion status is always:
+
+```text
+blocked_without_witness
+```
 
 ## The Semantic Compression Language (SCL)
 
@@ -158,7 +188,8 @@ The system has two connected strata.
 2. **Web Surface (`cortex.web`)**: HTTP health, status, invoke, self-test, law, PID-1, and ledger endpoints.
 3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
 4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
-5. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+5. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+6. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -176,6 +207,7 @@ cortex/
 ├── rollback.py          # Snapshot and self-repair mechanism
 ├── runtime.py           # Main agent loop and state machine
 ├── sacred.py            # Ritual/canon CLI and ledger utilities
+├── self_train.py        # Ledger-to-dataset self-training reports; no self-promotion
 ├── services.py          # Guardian, Scribe, and invocation pipeline
 ├── scl_parser.py        # SCL syntax parser
 ├── scl_schema.json      # JSON Schema for SCL records
@@ -210,6 +242,7 @@ python -m pytest \
   tests/test_init.py \
   tests/test_oracle.py \
   tests/test_pid1.py \
+  tests/test_self_train.py \
   tests/test_services.py \
   tests/test_web.py -q
 ```
