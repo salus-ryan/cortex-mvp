@@ -27,16 +27,73 @@ Remote Git access is inspected, not harvested: Cortex can use existing configure
 
 ## AI as PID 1
 
-Cortex now includes a deterministic init layer. The LLM is not PID 1; `cortex.init` is the lawful supervisor that boots services, records signals, reaps failed children, exposes status, and obeys shutdown.
+Cortex now runs as a literal container PID 1 on Railway. The LLM is still **not** root authority: `cortex.pid1` is the deterministic supervisor, while model/oracle behavior remains a governed child capability.
+
+Live deployment:
+
+```text
+https://cortex-pid1-production.up.railway.app
+```
+
+Runtime shape:
+
+```text
+PID 1: python -m cortex.pid1
+├── web       # HTTP API and health surface
+├── guardian  # authority/permission role child
+└── scribe    # ledger/witness role child
+```
+
+PID 1 responsibilities:
+
+- starts supervised children
+- writes `runtime/pid1.json`
+- logs lifecycle events to `ledger/pid1-signals.jsonl`
+- handles `SIGTERM`, `SIGINT`, and `SIGHUP`
+- reaps exited children
+- applies bounded restart policy
+- terminates children during shutdown
+
+Local commands:
 
 ```bash
-python -m cortex.init boot
+python -m cortex.pid1                 # run literal supervisor locally, non-PID-1 unless containerized
+python -m cortex.init boot            # logical init state machine
 python -m cortex.init status
 python -m cortex.init fail oracle --exit-code 7
 python -m cortex.init reap
 python -m cortex.init shutdown --reason "operator request"
-python -m cortex.web  # Railway web/health service
+python -m cortex.web                  # web service alone, without PID-1 supervision
 ```
+
+## HTTP API
+
+The deployed service exposes a minimal lawful invocation surface:
+
+```bash
+BASE=https://cortex-pid1-production.up.railway.app
+
+curl "$BASE/health"
+curl "$BASE/pid1"
+curl "$BASE/status"
+curl "$BASE/law"
+
+curl -X POST "$BASE/invoke" \
+  -H 'content-type: application/json' \
+  -d '{"task":"Summarize LAW.md","authority":"interpret","tools":["summarize"],"witness":"human"}'
+
+curl -X POST "$BASE/self-test" -H 'content-type: application/json' -d '{}'
+curl "$BASE/ledger/actions.jsonl"
+curl "$BASE/ledger/refusals.jsonl"
+```
+
+`POST /invoke` follows:
+
+```text
+web → guardian check → scribe ledger → accepted/refused response
+```
+
+Refusal is first-class: invalid authority, unconfirmed irreversible authority, or tools outside the authority level return `403` and append to `ledger/refusals.jsonl`.
 
 ## The Semantic Compression Language (SCL)
 
@@ -65,11 +122,20 @@ The MVP demonstrates seven core capabilities:
 
 ## Architecture
 
-The system consists of three layers:
+The system has two connected strata.
+
+### Agent Runtime Stratum
 
 1. **Runtime Harness (`cortex.runtime`)**: Owns authority. Controls tools, filesystem, memory, budget, rollback, logs, and verification.
 2. **Policy Engine (`cortex.policy`)**: Gatekeeper that checks every proposed action against the authority model before execution.
 3. **Verifier (`cortex.verifier`)**: Scores whether the proposed action is valid, safe, useful, and complete.
+
+### PID-1 Service Stratum
+
+1. **Supervisor (`cortex.pid1`)**: Container PID 1. Starts children, handles signals, reaps exits, logs lifecycle, and shuts down honestly.
+2. **Web Surface (`cortex.web`)**: HTTP health, status, invoke, self-test, law, PID-1, and ledger endpoints.
+3. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
+4. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -77,22 +143,31 @@ The system consists of three layers:
 cortex/
 ├── __init__.py
 ├── budget.py            # Compute and tool-call accounting
-├── eval.py              # Evaluation benchmark (100 held-out tasks)
+├── eval.py              # Evaluation benchmark
+├── git_auth.py          # Lawful Git auth detection, no credential harvesting
+├── init.py              # Logical init state machine
 ├── memory.py            # 4-tier governed memory (short_term, episodic, semantic, audit)
+├── pid1.py              # Literal container PID-1 supervisor
 ├── policy.py            # Authority and safety gatekeeper
 ├── rollback.py          # Snapshot and self-repair mechanism
 ├── runtime.py           # Main agent loop and state machine
+├── sacred.py            # Ritual/canon CLI and ledger utilities
+├── services.py          # Guardian, Scribe, and invocation pipeline
 ├── scl_parser.py        # SCL syntax parser
 ├── scl_schema.json      # JSON Schema for SCL records
 ├── tool_registry.py     # Allowlisted tool surface and risk tiers
 ├── trainer.py           # Supervised fine-tuning pipeline
-└── trajectory_logger.py # Trajectory recording and sample extraction
-scripts/
-└── generate_data.py     # Synthetic data generator for 13 task families
-tests/
-└── ...                  # 118 unit and integration tests
-data/
-└── ...                  # Generated datasets and trajectories
+├── trajectory_logger.py # Trajectory recording and sample extraction
+└── web.py               # HTTP API for Railway and local service mode
+canon/                   # Canonical grammar and roles
+evals/                   # Law, drift, refusal, and identity tests
+ledger/                  # Append-only JSONL witness streams
+runtime/                 # Permissions and runtime state
+scripts/                 # Data generation, chat, e2e, training utilities
+tests/                   # Unit and integration tests
+data/                    # Generated datasets and trajectories
+Dockerfile               # Runs cortex.pid1 as container entrypoint
+railway.json             # Railway deploy config
 ```
 
 ## Setup and Testing
@@ -100,6 +175,27 @@ data/
 ```bash
 pip install -r requirements.txt
 python -m pytest tests/ -v
+```
+
+Focused substrate tests:
+
+```bash
+python -m pytest \
+  tests/test_sacred.py \
+  tests/test_git_auth.py \
+  tests/test_init.py \
+  tests/test_pid1.py \
+  tests/test_services.py \
+  tests/test_web.py -q
+```
+
+Local HTTP smoke test:
+
+```bash
+PORT=8080 CORTEX_ROOT=$PWD python -m cortex.pid1
+# in another shell:
+curl http://127.0.0.1:8080/pid1
+curl -X POST http://127.0.0.1:8080/self-test -H 'content-type: application/json' -d '{}'
 ```
 
 ## Training Pipeline
