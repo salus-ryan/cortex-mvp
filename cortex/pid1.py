@@ -128,6 +128,12 @@ DEFAULT_CHILDREN = [
         restart="on-failure",
         authority="act_reversible",
     ),
+    ChildSpec(
+        name="deploy",
+        command=[sys.executable, "-m", "cortex.service_server", "deploy"],
+        restart="on-failure",
+        authority="act_irreversible",
+    ),
 ]
 
 

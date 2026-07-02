@@ -120,6 +120,8 @@ curl -X POST "$BASE/repo/verify" -H 'content-type: application/json' -d '{"scope
 curl -X POST "$BASE/patch/check" -H 'content-type: application/json' -d '{"patch":"diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n"}'
 curl -X POST "$BASE/build/propose" -H 'content-type: application/json' -d '{"task":"make a safe improvement"}'
 curl "$BASE/build/report"
+curl "$BASE/deploy/status"
+curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
 
 curl -X POST "$BASE/v1/chat/completions" \
   -H 'content-type: application/json' \
@@ -240,10 +242,11 @@ The system has two connected strata.
 12. **Repo Verifier (`cortex.repo_service`)**: Grounded repo status, diff, and allowlisted pytest verification loop.
 13. **Patch Service (`cortex.patch_service`)**: Validates and applies reversible unified diffs only with witness and confirmation.
 14. **Build Loop (`cortex.build_loop`)**: Orchestrates propose → check → witness apply → verify → report.
-15. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
-16. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
-17. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-18. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+15. **Deploy Service (`cortex.deploy_service`)**: Witness-gated Railway deploy preflight and allowlisted deploy command.
+16. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
+17. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
+18. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+19. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -257,6 +260,7 @@ cortex/
 ├── memory.py            # 4-tier governed runtime memory (short_term, episodic, semantic, audit)
 ├── build_loop.py        # Governed build-loop orchestration
 ├── deliberation.py      # Multi-step local recommendation engine
+├── deploy_service.py    # Witness-gated Railway deployment organ
 ├── immune.py            # Artificial immune system and quarantine memory
 ├── local_mind.py        # Local non-rented retrieval/synthesis cognition
 ├── memory_service.py    # Typed sourced JSONL memory service
@@ -306,6 +310,7 @@ python -m pytest \
   tests/test_sacred.py \
   tests/test_build_loop.py \
   tests/test_deliberation.py \
+  tests/test_deploy_service.py \
   tests/test_git_auth.py \
   tests/test_immune.py \
   tests/test_init.py \

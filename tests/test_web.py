@@ -158,6 +158,10 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["status"] == "proposed"
         code, data = get(base + "/build/report")
         assert code == 200 and data["may_execute"] is False
+        code, data = get(base + "/deploy/status")
+        assert code == 200 and data["may_execute"] is False
+        code, data = post(base + "/deploy/check", {})
+        assert code == 200 and data["status"] in {"pass", "blocked"}
     finally:
         server.shutdown()
 

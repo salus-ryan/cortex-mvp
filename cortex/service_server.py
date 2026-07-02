@@ -12,6 +12,7 @@ from typing import Any
 
 from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
+from cortex.deploy_service import DeployService
 from cortex.immune import ImmuneService
 from cortex.memory_service import MemoryService
 from cortex.oracle import OracleService
@@ -22,7 +23,7 @@ from cortex.repo_service import RepoService
 from cortex.services import GuardianService, ScribeService
 from cortex.tool_gateway import ToolGateway
 
-DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108, "immune": 8109, "repo": 8110, "patch": 8111, "build": 8112}
+DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108, "immune": 8109, "repo": 8110, "patch": 8111, "build": 8112, "deploy": 8113}
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict[str, Any]) -> None:
@@ -80,6 +81,12 @@ class RoleHandler(BaseHTTPRequestHandler):
             return
         if self.role == "build" and self.path == "/report":
             _json_response(self, 200, BuildLoopService(self.root).report())
+            return
+        if self.role == "deploy" and self.path == "/status":
+            _json_response(self, 200, DeployService(self.root).status())
+            return
+        if self.role == "deploy" and self.path == "/report":
+            _json_response(self, 200, DeployService(self.root).report())
             return
         _json_response(self, 404, {"status": "not_found", "role": self.role})
 
@@ -182,6 +189,14 @@ class RoleHandler(BaseHTTPRequestHandler):
         if self.role == "build" and self.path == "/verify":
             result = BuildLoopService(self.root).verify(str(payload.get("scope", "quick")))
             _json_response(self, 200 if result["status"] == "verified" else 500, result)
+            return
+
+        if self.role == "deploy" and self.path == "/check":
+            _json_response(self, 200, DeployService(self.root).check(payload.get("expected_commit")))
+            return
+        if self.role == "deploy" and self.path == "/railway":
+            result = DeployService(self.root).railway(payload.get("witness"), bool(payload.get("confirmed", False)), payload.get("expected_commit"), payload.get("public_url"))
+            _json_response(self, 200 if result["status"] == "deployed" else 403, result)
             return
 
         _json_response(self, 404, {"status": "not_found", "role": self.role})

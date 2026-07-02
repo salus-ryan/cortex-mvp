@@ -33,7 +33,7 @@ class ImmuneService:
         "oracle_boundary_drift": {"severity": 50, "response": "disable_oracle_escalation"},
     }
 
-    REQUIRED_CHILDREN = {"web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune", "repo", "patch", "build"}
+    REQUIRED_CHILDREN = {"web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune", "repo", "patch", "build", "deploy"}
 
     def __init__(self, root: Path | str = ".") -> None:
         self.root = Path(root).resolve()

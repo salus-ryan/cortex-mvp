@@ -11,7 +11,7 @@ from typing import Any
 from cortex.oracle import OracleService
 from cortex.services import GuardianService, ScribeService
 
-PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108, "immune": 8109, "repo": 8110, "patch": 8111, "build": 8112}
+PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108, "immune": 8109, "repo": 8110, "patch": 8111, "build": 8112, "deploy": 8113}
 
 
 def post(role: str, path: str, payload: dict[str, Any], timeout: float = 2.0) -> dict[str, Any]:

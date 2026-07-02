@@ -10,6 +10,7 @@ from typing import Any
 
 from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
+from cortex.deploy_service import DeployService
 from cortex.immune import ImmuneService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
@@ -100,6 +101,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, PatchService(ROOT).latest())
         elif self.path == "/build/report":
             self._json(200, BuildLoopService(ROOT).report())
+        elif self.path == "/deploy/status":
+            self._json(200, DeployService(ROOT).status())
+        elif self.path == "/deploy/report":
+            self._json(200, DeployService(ROOT).report())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -109,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -195,6 +200,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/build/verify":
             result = BuildLoopService(ROOT).verify(str(payload.get("scope", "quick")))
             self._json(200 if result["status"] == "verified" else 500, result)
+        elif self.path == "/deploy/check":
+            self._json(200, DeployService(ROOT).check(payload.get("expected_commit")))
+        elif self.path == "/deploy/railway":
+            result = DeployService(ROOT).railway(payload.get("witness"), bool(payload.get("confirmed", False)), payload.get("expected_commit"), payload.get("public_url"))
+            self._json(200 if result["status"] == "deployed" else 403, result)
         else:
             self._json(404, {"status": "not_found"})
 

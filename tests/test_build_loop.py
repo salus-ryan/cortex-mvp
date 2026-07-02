@@ -13,7 +13,7 @@ def init_repo(root: Path) -> str:
     (root / "tests").mkdir()
     (root / "tests" / "test_ok.py").write_text("def test_ok():\n    assert True\n")
     (root / "runtime").mkdir()
-    children = {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune", "repo", "patch", "build"]}
+    children = {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator", "immune", "repo", "patch", "build", "deploy"]}
     (root / "runtime" / "pid1.json").write_text(__import__("json").dumps({"is_pid1": True, "children": children}))
     subprocess.run(["git", "add", "hello.txt", "tests/test_ok.py"], cwd=root, check=True)
     subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
