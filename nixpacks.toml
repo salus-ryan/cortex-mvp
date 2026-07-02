@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python313"]
+
+[phases.install]
+cmds = ["python -m pip install --upgrade pip"]
+
+[start]
+cmd = "python -m cortex.web"
