@@ -11,7 +11,7 @@ from typing import Any
 from cortex.oracle import OracleService
 from cortex.services import GuardianService, ScribeService
 
-PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103}
+PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104}
 
 
 def post(role: str, path: str, payload: dict[str, Any], timeout: float = 2.0) -> dict[str, Any]:
@@ -71,5 +71,28 @@ class OracleClient:
             return post("oracle", "/propose", {"task": task, "authority": authority, "context": context}, timeout=50.0)
         except Exception:
             data = OracleService(self.root).propose(task, authority, context).to_dict()
+            data["fallback"] = "in_process"
+            return data
+
+
+class ProphetClient:
+    def __init__(self, root: Path | str) -> None:
+        self.root = Path(root)
+
+    def evaluate(self) -> dict[str, Any]:
+        try:
+            return post("prophet", "/evaluate", {}, timeout=60.0)
+        except Exception:
+            from cortex.prophet import ProphetService
+            data = ProphetService(self.root).evaluate()
+            data["fallback"] = "in_process"
+            return data
+
+    def report(self) -> dict[str, Any]:
+        try:
+            return get("prophet", "/report", timeout=10.0)
+        except Exception:
+            from cortex.prophet import ProphetService
+            data = ProphetService(self.root).latest()
             data["fallback"] = "in_process"
             return data

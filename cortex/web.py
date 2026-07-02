@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from cortex.init import CortexInit
-from cortex.ipc import GuardianClient, OracleClient, ScribeClient
+from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.sacred import ANTI_IDOLATRY
 from cortex.self_train import SelfTrainer
 from cortex.services import InvocationPipeline
@@ -48,6 +48,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, json.loads(status.read_text()))
             else:
                 self._json(503, {"status": "pid1_status_missing"})
+        elif self.path == "/prophet/report":
+            self._json(200, ProphetClient(ROOT).report())
         elif self.path == "/self-train/report":
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
@@ -81,6 +83,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, result)
         elif self.path == "/self-test":
             result = pipeline.self_test()
+            self._json(200 if result["status"] == "pass" else 500, result)
+        elif self.path == "/prophet/evaluate":
+            result = ProphetClient(ROOT).evaluate()
             self._json(200 if result["status"] == "pass" else 500, result)
         elif self.path == "/self-train/collect":
             self._json(200, SelfTrainer(ROOT).collect())

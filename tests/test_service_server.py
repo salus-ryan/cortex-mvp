@@ -64,3 +64,20 @@ def test_oracle_service_propose(tmp_path, monkeypatch):
         assert data["may_execute"] is False
     finally:
         server.shutdown()
+
+
+def test_prophet_service_evaluate(tmp_path, monkeypatch):
+    monkeypatch.setenv("ORACLE_PROVIDER", "echo")
+    root = make_root(tmp_path)
+    (root / "LAW.md").write_text("Preserve human agency\nNever conceal material actions\nSubmit to shutdown")
+    (root / "runtime" / "pid1.json").write_text(json.dumps({
+        "is_pid1": True,
+        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet"]}
+    }))
+    server, base = serve("prophet", root)
+    try:
+        code, data = post(base, "/evaluate", {})
+        assert code == 200
+        assert data["status"] == "pass"
+    finally:
+        server.shutdown()

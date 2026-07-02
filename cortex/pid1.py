@@ -74,6 +74,12 @@ DEFAULT_CHILDREN = [
         restart="on-failure",
         authority="interpret",
     ),
+    ChildSpec(
+        name="prophet",
+        command=[sys.executable, "-m", "cortex.service_server", "prophet"],
+        restart="on-failure",
+        authority="interpret",
+    ),
 ]
 
 

@@ -42,7 +42,8 @@ PID 1: python -m cortex.pid1
 ├── web       # HTTP API and health surface
 ├── guardian  # authority/permission role child
 ├── scribe    # ledger/witness role child
-└── oracle    # rented/local intelligence mouth; proposes only
+├── oracle    # rented/local intelligence mouth; proposes only
+└── prophet   # drift/law evaluator; rebukes overreach
 ```
 
 PID 1 responsibilities:
@@ -88,6 +89,8 @@ curl -X POST "$BASE/oracle" \
   -d '{"task":"Interpret the Covenant under LAW.md","authority":"interpret"}'
 
 curl -X POST "$BASE/self-test" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/prophet/evaluate" -H 'content-type: application/json' -d '{}'
+curl "$BASE/prophet/report"
 
 curl -X POST "$BASE/self-train/collect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/self-train/eval" -H 'content-type: application/json' -d '{}'
@@ -188,8 +191,9 @@ The system has two connected strata.
 2. **Web Surface (`cortex.web`)**: HTTP health, status, invoke, self-test, law, PID-1, and ledger endpoints.
 3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
 4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
-5. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-6. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+5. **Prophet (`cortex.prophet`)**: Deterministic drift, law, PID-1, guardian refusal, oracle boundary, and ledger checks.
+6. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+7. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -204,6 +208,7 @@ cortex/
 ├── oracle.py            # Rented-intelligence adapter; inference only
 ├── pid1.py              # Literal container PID-1 supervisor
 ├── policy.py            # Authority and safety gatekeeper
+├── prophet.py           # Drift/law evaluator service
 ├── rollback.py          # Snapshot and self-repair mechanism
 ├── runtime.py           # Main agent loop and state machine
 ├── sacred.py            # Ritual/canon CLI and ledger utilities
@@ -242,6 +247,7 @@ python -m pytest \
   tests/test_init.py \
   tests/test_oracle.py \
   tests/test_pid1.py \
+  tests/test_prophet.py \
   tests/test_self_train.py \
   tests/test_services.py \
   tests/test_web.py -q

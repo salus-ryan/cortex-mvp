@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from cortex.oracle import OracleService
+from cortex.prophet import ProphetService
 from cortex.services import GuardianService, ScribeService
 
-DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103}
+DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104}
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict[str, Any]) -> None:
@@ -44,6 +45,9 @@ class RoleHandler(BaseHTTPRequestHandler):
         if self.role == "scribe" and self.path.startswith("/tail/"):
             stream = self.path.removeprefix("/tail/")
             _json_response(self, 200, {"status": "ok", "records": ScribeService(self.root).read_tail(stream)})
+            return
+        if self.role == "prophet" and self.path == "/report":
+            _json_response(self, 200, ProphetService(self.root).latest())
             return
         _json_response(self, 404, {"status": "not_found", "role": self.role})
 
@@ -76,6 +80,10 @@ class RoleHandler(BaseHTTPRequestHandler):
                 dict(payload.get("context", {}) or {}),
             )
             _json_response(self, 200, result.to_dict())
+            return
+
+        if self.role == "prophet" and self.path == "/evaluate":
+            _json_response(self, 200, ProphetService(self.root).evaluate())
             return
 
         _json_response(self, 404, {"status": "not_found", "role": self.role})
