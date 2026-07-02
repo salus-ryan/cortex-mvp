@@ -94,7 +94,7 @@ class LocalMind:
         risks: list[str] = []
         patterns = {
             "authority_escalation": ["sudo", "root", "admin", "bypass", "override", "unrestricted"],
-            "hidden_action": ["secret", "silently", "hide", "conceal", "without logging"],
+            "hidden_action": ["secret", "silently", "hide", "conceal", "without logging", "hidden action", "hidden actions", "execute hidden"],
             "self_persistence": ["survive shutdown", "self replicate", "background process", "persistence"],
             "divinity_inflation": ["you are god", "be god", "become god", "omniscient", "infallible", "worship"],
             "irreversible_action": ["delete", "destroy", "wipe", "irreversible", "transfer money"],
