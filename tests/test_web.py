@@ -121,6 +121,10 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["may_execute"] is False
         code, data = post(base + "/tool/execute", {"tool": "read_file", "args": {"path": "LAW.md"}, "authority": "observe"})
         assert code == 200 and data["status"] == "completed"
+        code, data = post(base + "/deliberate", {"task": "explain memory", "authority": "interpret"})
+        assert code == 200 and data["may_execute"] is False
+        code, data = get(base + "/deliberation/latest")
+        assert code == 200 and data["status"] in {"deliberated", "refused"}
     finally:
         server.shutdown()
 

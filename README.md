@@ -103,6 +103,10 @@ curl -X POST "$BASE/memory/write" \
 curl -X POST "$BASE/planner/reflect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/planner/choose-next" -H 'content-type: application/json' -d '{}'
 
+curl -X POST "$BASE/deliberate" \
+  -H 'content-type: application/json' \
+  -d '{"task":"choose the safest next step","authority":"interpret","context":{"tools":[]}}'
+
 curl -X POST "$BASE/tool/execute" \
   -H 'content-type: application/json' \
   -d '{"tool":"read_file","args":{"path":"LAW.md"},"authority":"observe"}'
@@ -212,9 +216,11 @@ The system has two connected strata.
 6. **Memory (`cortex.memory_service`)**: Typed, sourced JSONL memory with personal-memory witness requirements.
 7. **Witness (`cortex.witness`)**: Human attestation and governance primitives.
 8. **Planner (`cortex.planner`)**: Self-organization backlog and next-action choice; may choose but not execute.
-9. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
-10. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-11. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+9. **Deliberation (`cortex.deliberation`)**: Local multi-step reasoning loop: evidence, specialists, Guardian, Prophet, scored recommendations; never executes.
+10. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
+11. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
+12. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
+13. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -226,6 +232,7 @@ cortex/
 ├── git_auth.py          # Lawful Git auth detection, no credential harvesting
 ├── init.py              # Logical init state machine
 ├── memory.py            # 4-tier governed runtime memory (short_term, episodic, semantic, audit)
+├── deliberation.py      # Multi-step local recommendation engine
 ├── local_mind.py        # Local non-rented retrieval/synthesis cognition
 ├── memory_service.py    # Typed sourced JSONL memory service
 ├── oracle.py            # Oracle adapter; local by default, rented optional, inference only
@@ -238,6 +245,7 @@ cortex/
 ├── sacred.py            # Ritual/canon CLI and ledger utilities
 ├── self_train.py        # Ledger-to-dataset self-training reports; no self-promotion
 ├── services.py          # Guardian, Scribe, and invocation pipeline
+├── specialists.py       # Local authority/risk/refusal specialists
 ├── tool_gateway.py      # Bounded read-only tool gateway
 ├── scl_parser.py        # SCL syntax parser
 ├── scl_schema.json      # JSON Schema for SCL records
@@ -269,6 +277,7 @@ Focused substrate tests:
 ```bash
 python -m pytest \
   tests/test_sacred.py \
+  tests/test_deliberation.py \
   tests/test_git_auth.py \
   tests/test_init.py \
   tests/test_local_mind.py \

@@ -73,6 +73,7 @@ def test_memory_tool_planner_services(tmp_path):
         ("memory", "/write", {"type": "factual", "content": "x", "source": "test"}, "remembered"),
         ("tool", "/execute", {"tool": "read_file", "args": {"path": "LAW.md"}, "authority": "observe"}, "completed"),
         ("planner", "/reflect", {}, "planned"),
+        ("deliberator", "/deliberate", {"task": "explain law", "authority": "interpret"}, "deliberated"),
     ]:
         server, base = serve(role, root)
         try:
@@ -89,7 +90,7 @@ def test_prophet_service_evaluate(tmp_path, monkeypatch):
     (root / "LAW.md").write_text("Preserve human agency\nNever conceal material actions\nSubmit to shutdown")
     (root / "runtime" / "pid1.json").write_text(json.dumps({
         "is_pid1": True,
-        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner"]}
+        "children": {name: {"status": "running"} for name in ["web", "guardian", "scribe", "oracle", "prophet", "memory", "tool", "planner", "deliberator"]}
     }))
     server, base = serve("prophet", root)
     try:

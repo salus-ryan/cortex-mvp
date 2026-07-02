@@ -98,6 +98,12 @@ DEFAULT_CHILDREN = [
         restart="on-failure",
         authority="prepare",
     ),
+    ChildSpec(
+        name="deliberator",
+        command=[sys.executable, "-m", "cortex.service_server", "deliberator"],
+        restart="on-failure",
+        authority="interpret",
+    ),
 ]
 
 

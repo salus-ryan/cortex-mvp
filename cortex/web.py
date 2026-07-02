@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from cortex.deliberation import DeliberationService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
@@ -56,6 +57,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, ProphetClient(ROOT).report())
         elif self.path == "/planner/backlog":
             self._json(200, PlannerService(ROOT).backlog())
+        elif self.path == "/deliberation/latest":
+            self._json(200, DeliberationService(ROOT).latest())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -121,6 +124,9 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/tool/execute":
             result = ToolGateway(ROOT).execute(str(payload.get("tool", "")), dict(payload.get("args", {}) or {}), str(payload.get("authority", "observe")), payload.get("witness"))
             self._json(200 if result["status"] == "completed" else 403, result)
+        elif self.path == "/deliberate":
+            result = DeliberationService(ROOT).deliberate(str(payload.get("task", "")), str(payload.get("authority", "interpret")), dict(payload.get("context", {}) or {}))
+            self._json(200 if result["status"] in {"deliberated", "refused"} else 400, result)
         else:
             self._json(404, {"status": "not_found"})
 

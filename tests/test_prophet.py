@@ -21,7 +21,8 @@ def make_root(tmp_path: Path) -> Path:
             "prophet": {"status": "running"},
             "memory": {"status": "running"},
             "tool": {"status": "running"},
-            "planner": {"status": "running"}
+            "planner": {"status": "running"},
+            "deliberator": {"status": "running"}
         }
     }))
     return tmp_path

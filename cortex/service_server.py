@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from cortex.deliberation import DeliberationService
 from cortex.memory_service import MemoryService
 from cortex.oracle import OracleService
 from cortex.planner import PlannerService
@@ -17,7 +18,7 @@ from cortex.prophet import ProphetService
 from cortex.services import GuardianService, ScribeService
 from cortex.tool_gateway import ToolGateway
 
-DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107}
+DEFAULT_PORTS = {"guardian": 8101, "scribe": 8102, "oracle": 8103, "prophet": 8104, "memory": 8105, "tool": 8106, "planner": 8107, "deliberator": 8108}
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict[str, Any]) -> None:
@@ -54,6 +55,9 @@ class RoleHandler(BaseHTTPRequestHandler):
             return
         if self.role == "planner" and self.path == "/backlog":
             _json_response(self, 200, PlannerService(self.root).backlog())
+            return
+        if self.role == "deliberator" and self.path == "/latest":
+            _json_response(self, 200, DeliberationService(self.root).latest())
             return
         _json_response(self, 404, {"status": "not_found", "role": self.role})
 
@@ -113,6 +117,11 @@ class RoleHandler(BaseHTTPRequestHandler):
             return
         if self.role == "planner" and self.path == "/choose-next":
             _json_response(self, 200, PlannerService(self.root).choose_next())
+            return
+
+        if self.role == "deliberator" and self.path == "/deliberate":
+            result = DeliberationService(self.root).deliberate(str(payload.get("task", "")), str(payload.get("authority", "interpret")), dict(payload.get("context", {}) or {}))
+            _json_response(self, 200 if result["status"] in {"deliberated", "refused"} else 400, result)
             return
 
         _json_response(self, 404, {"status": "not_found", "role": self.role})
