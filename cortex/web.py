@@ -10,6 +10,7 @@ from typing import Any
 
 from cortex.init import CortexInit
 from cortex.sacred import ANTI_IDOLATRY
+from cortex.services import InvocationPipeline, ScribeService
 
 ROOT = Path(os.environ.get("CORTEX_ROOT", os.getcwd())).resolve()
 
@@ -22,6 +23,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("content-length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _read_json_body(self) -> dict[str, Any]:
+        length = int(self.headers.get("content-length", "0") or "0")
+        if length <= 0:
+            return {}
+        raw = self.rfile.read(length).decode("utf-8")
+        return json.loads(raw) if raw.strip() else {}
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib API
         init = CortexInit(ROOT)
@@ -38,6 +46,29 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, json.loads(status.read_text()))
             else:
                 self._json(503, {"status": "pid1_status_missing"})
+        elif self.path.startswith("/ledger/"):
+            stream = self.path.removeprefix("/ledger/")
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl"}:
+                self._json(404, {"status": "unknown_ledger_stream"})
+            else:
+                self._json(200, {"status": "ok", "stream": stream, "records": ScribeService(ROOT).read_tail(stream)})
+        else:
+            self._json(404, {"status": "not_found"})
+
+    def do_POST(self) -> None:  # noqa: N802 - stdlib API
+        try:
+            payload = self._read_json_body()
+        except json.JSONDecodeError as exc:
+            self._json(400, {"status": "bad_json", "error": str(exc)})
+            return
+
+        pipeline = InvocationPipeline(ROOT)
+        if self.path == "/invoke":
+            result = pipeline.invoke(payload)
+            self._json(200 if result["status"] == "accepted" else 403, result)
+        elif self.path == "/self-test":
+            result = pipeline.self_test()
+            self._json(200 if result["status"] == "pass" else 500, result)
         else:
             self._json(404, {"status": "not_found"})
 
