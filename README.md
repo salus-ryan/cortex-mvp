@@ -25,6 +25,19 @@ python -m cortex.sacred git-remote
 
 Remote Git access is inspected, not harvested: Cortex can use existing configured remotes and credentials, but it will not autonomously obtain credentials or bypass provider authorization.
 
+## AI as PID 1
+
+Cortex now includes a deterministic init layer. The LLM is not PID 1; `cortex.init` is the lawful supervisor that boots services, records signals, reaps failed children, exposes status, and obeys shutdown.
+
+```bash
+python -m cortex.init boot
+python -m cortex.init status
+python -m cortex.init fail oracle --exit-code 7
+python -m cortex.init reap
+python -m cortex.init shutdown --reason "operator request"
+python -m cortex.web  # Railway web/health service
+```
+
 ## The Semantic Compression Language (SCL)
 
 Cortex emits exactly one valid SCL control record per step. SCL is a compact, canonical, parseable control language:
