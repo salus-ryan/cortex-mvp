@@ -38,6 +38,7 @@ def test_deploy_requires_witness_and_confirmation(tmp_path):
 
 def test_deploy_railway_allowlisted_command(tmp_path, monkeypatch):
     root = make_root(tmp_path)
+    monkeypatch.setenv("RAILWAY_TOKEN", "test-token")
     monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/railway")
 
     class Proc:

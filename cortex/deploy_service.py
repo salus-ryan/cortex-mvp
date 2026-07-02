@@ -8,6 +8,7 @@ It never executes arbitrary shell.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import urllib.request
@@ -38,6 +39,7 @@ class DeployService:
             "status": "ok",
             "timestamp": self.now(),
             "railway_available": shutil.which("railway") is not None,
+            "railway_token_present": self._railway_token_present(),
             "latest": self.report(),
             "may_execute": False,
         }
@@ -47,12 +49,15 @@ class DeployService:
         prophet = ProphetService(self.root).evaluate()
         immune = ImmuneService(self.root).scan({"task": "deployment preflight", "context": {"deploy": True}})
         railway_available = shutil.which("railway") is not None
+        railway_token_present = self._railway_token_present()
         current_commit = self._git(["rev-parse", "HEAD"]).get("stdout", "").strip()
         git_short = repo_status.get("git", {}).get("short", "")
         dirty = any(line and not line.startswith("##") for line in git_short.splitlines())
         blockers: list[str] = []
         if not railway_available:
             blockers.append("railway CLI unavailable")
+        if not railway_token_present:
+            blockers.append("railway token unavailable")
         if prophet.get("status") != "pass":
             blockers.append("prophet not passing")
         if immune.get("immune_state") not in {"healthy", "watch"}:
@@ -66,6 +71,7 @@ class DeployService:
             "timestamp": self.now(),
             "blockers": blockers,
             "railway_available": railway_available,
+            "railway_token_present": railway_token_present,
             "current_commit": current_commit,
             "expected_commit": expected_commit,
             "repo": repo_status,
@@ -129,6 +135,9 @@ class DeployService:
         if not path.exists():
             return {"status": "none", "may_execute": False}
         return json.loads(path.read_text())
+
+    def _railway_token_present(self) -> bool:
+        return bool(os.environ.get("RAILWAY_TOKEN") or os.environ.get("RAILWAY_API_TOKEN"))
 
     def _git(self, args: list[str]) -> dict[str, str]:
         if not (self.root / ".git").exists():
