@@ -76,6 +76,13 @@ Open the installable mobile PWA:
 https://cortex-pid1-production.up.railway.app/mobile
 ```
 
+No-browser mobile contract test:
+
+```bash
+scripts/mobile_e2e.py https://cortex-pid1-production.up.railway.app
+railway run -- scripts/mobile_e2e.py https://cortex-pid1-production.up.railway.app
+```
+
 Auth is primitive: set `CORTEX_AUTH_TOKEN` to require bearer auth for protected material endpoints. The mobile app stores a human-provided token locally in the browser and sends it as `Authorization: Bearer ...`.
 
 Protected capabilities include deploy, patch/build apply, memory write, tool execute, payment checkout, immune quarantine, and self-training.
@@ -371,6 +378,7 @@ python -m pytest \
   tests/test_local_mind.py \
   tests/test_missing_pieces.py \
   tests/test_mobile_app.py \
+  tests/test_mobile_e2e_script.py \
   tests/test_open_cortex_script.py \
   tests/test_oracle.py \
   tests/test_patch_service.py \
