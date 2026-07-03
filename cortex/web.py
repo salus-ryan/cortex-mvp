@@ -26,6 +26,7 @@ from cortex.repo_service import RepoService
 from cortex.sacred import ANTI_IDOLATRY
 from cortex.self_train import SelfTrainer
 from cortex.services import InvocationPipeline
+from cortex.tool_algebra import ToolAlgebra
 from cortex.tool_gateway import ToolGateway
 from cortex.witness import WitnessService
 
@@ -205,6 +206,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/relationship/remember":
             result = RelationshipService(ROOT).remember(str(payload.get("content", "")), payload.get("witness"), str(payload.get("source", "mobile_chat")))
             self._json(200 if result["status"] == "remembered" else 400, result)
+        elif self.path == "/verify/claim":
+            evidence = payload.get("evidence", [])
+            if isinstance(evidence, str):
+                evidence = [evidence]
+            self._json(200, ToolAlgebra().verify_claim(str(payload.get("claim", "")), [str(x) for x in evidence]))
         elif self.path == "/relationship/converse":
             text = str(payload.get("content", "")).strip()
             witness = payload.get("witness")

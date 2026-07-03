@@ -28,6 +28,29 @@ refusal
 human control
 ```
 
+## Imported slices
+
+### tool-algebra-plugin slice 1
+
+Implemented local Cortex equivalents:
+
+```text
+cortex/tool_algebra.py
+POST /verify/claim
+ToolGateway output validation/redaction
+```
+
+Capabilities:
+
+```text
+PII taint detection
+safe output redaction
+truncation signal
+claim verification against observable evidence
+```
+
+No arbitrary execution was imported.
+
 ## Runtime visibility
 
 Cortex exposes the research map at:

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from cortex.services import GuardianService, ScribeService
+from cortex.tool_algebra import ToolAlgebra
 
 
 class ToolGateway:
@@ -16,6 +17,7 @@ class ToolGateway:
         self.root = Path(root).resolve()
         self.guardian = GuardianService(self.root)
         self.scribe = ScribeService(self.root)
+        self.algebra = ToolAlgebra()
 
     def execute(self, tool: str, args: dict[str, Any], authority: str = "observe", witness: str | None = None) -> dict[str, Any]:
         check = self.guardian.check_invocation(authority, [tool], False)
@@ -39,5 +41,7 @@ class ToolGateway:
             if not str(path).startswith(str(self.root)) or not path.is_dir():
                 return {"status": "refused", "reason": "path outside workspace or not directory"}
             output = sorted(p.name for p in path.iterdir())[:200]
-        rec = self.scribe.append("actions.jsonl", {"actor": "tool", "action_type": "tool_execute", "tool": tool, "authority_level": authority, "witnesses": [witness] if witness else [], "status": "completed"})
-        return {"status": "completed", "tool": tool, "output": output, "record": rec, "reversible": True}
+        validation = self.algebra.validate_output(tool, output)
+        safe_output = validation["safe_output"] if isinstance(output, str) else output
+        rec = self.scribe.append("actions.jsonl", {"actor": "tool", "action_type": "tool_execute", "tool": tool, "authority_level": authority, "witnesses": [witness] if witness else [], "status": "completed", "validation": {k: v for k, v in validation.items() if k != "safe_output"}})
+        return {"status": "completed", "tool": tool, "output": safe_output, "validation": validation, "record": rec, "reversible": True}

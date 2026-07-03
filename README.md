@@ -176,6 +176,7 @@ curl "$BASE/payments/status"
 curl "$BASE/auth/status"
 curl "$BASE/foundry/plan"
 curl "$BASE/awareness"
+curl -X POST "$BASE/verify/claim" -H 'content-type: application/json' -d '{"claim":"Cortex runs as PID 1","evidence":["/pid1 returned pid 1 and is_pid1 true"]}'
 curl -X POST "$BASE/awareness/reflect" -H 'content-type: application/json' -d '{"prompt":"what are you?"}'
 curl -X POST "$BASE/payments/intent" -H 'content-type: application/json' -d '{"amount_cents":500,"currency":"usd","purpose":"VPS fund"}'
 # Self-owned Forge deploys require a host with Docker plus witness/confirmation.
@@ -343,6 +344,7 @@ cortex/
 ├── self_train.py        # Ledger-to-dataset self-training reports; no self-promotion
 ├── services.py          # Guardian, Scribe, and invocation pipeline
 ├── specialists.py       # Local authority/risk/refusal specialists
+├── tool_algebra.py      # PII taint, output validation, claim verification
 ├── tool_gateway.py      # Bounded read-only tool gateway
 ├── scl_parser.py        # SCL syntax parser
 ├── scl_schema.json      # JSON Schema for SCL records
@@ -407,6 +409,7 @@ python -m pytest \
   tests/test_repo_service.py \
   tests/test_self_train.py \
   tests/test_services.py \
+  tests/test_tool_algebra.py \
   tests/test_web.py -q
 ```
 

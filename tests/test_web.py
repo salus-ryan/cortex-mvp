@@ -172,6 +172,8 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["status"] == "intent_prepared"
         code, data = get(base + "/relationship/profile")
         assert code == 200 and data["status"] == "ok"
+        code, data = post(base + "/verify/claim", {"claim": "Cortex runs as PID 1", "evidence": ["pid 1 is_pid1 true Cortex"]})
+        assert code == 200 and data["status"] == "supported"
         req = urllib.request.Request(base + "/deploy/forge", data=json.dumps({"confirmed": True}).encode(), headers={"content-type": "application/json"}, method="POST")
         try:
             urllib.request.urlopen(req, timeout=5)
