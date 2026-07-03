@@ -51,6 +51,7 @@ class MemoryService:
         paths = [self._path(typ)] if typ else [self.dir / f"{t}.jsonl" for t in sorted(TYPES)]
         rows: list[dict[str, Any]] = []
         q = query.lower()
+        forgotten = self.forgotten_ids()
         for path in paths:
             if not path.exists():
                 continue
@@ -58,6 +59,43 @@ class MemoryService:
                 if not line.strip():
                     continue
                 rec = json.loads(line)
+                if rec.get("id") in forgotten:
+                    continue
                 if not q or q in rec.get("content", "").lower() or q in rec.get("source", "").lower():
                     rows.append(rec)
         return rows[-limit:]
+
+    def forgotten_ids(self) -> set[str]:
+        path = self.dir / "forgotten.jsonl"
+        if not path.exists():
+            return set()
+        ids: set[str] = set()
+        for line in path.read_text().splitlines():
+            if line.strip():
+                ids.add(json.loads(line).get("id", ""))
+        return ids
+
+    def forget(self, memory_id: str, witness: str | None, reason: str = "user request") -> dict[str, Any]:
+        if not witness:
+            raise ValueError("forget requires witness")
+        found = None
+        for rec in self.retrieve(limit=10_000):
+            if rec.get("id") == memory_id:
+                found = rec
+                break
+        if not found:
+            raise ValueError("memory id not found")
+        tombstone = {
+            "id": memory_id,
+            "forgotten_at": self.now(),
+            "witness": witness,
+            "reason": reason,
+            "sha256": hashlib.sha256(f"forget:{memory_id}:{reason}".encode()).hexdigest(),
+            "law": ["LAW 6", "LAW 7"],
+        }
+        with (self.dir / "forgotten.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(tombstone, sort_keys=True) + "\n")
+        return tombstone
+
+    def export(self, typ: str | None = None) -> dict[str, Any]:
+        return {"status": "ok", "type": typ or "all", "records": self.retrieve(typ=typ, limit=10_000), "forgotten_ids": sorted(self.forgotten_ids())}

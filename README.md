@@ -87,7 +87,7 @@ Auth is primitive: set `CORTEX_AUTH_TOKEN` to require bearer auth for protected 
 
 Protected capabilities include deploy, patch/build apply, memory write, relationship memory, tool execute, payment checkout, immune quarantine, and self-training.
 
-The mobile `Know` tab lets the human talk with Cortex through one `Send` action. Cortex replies and learns the message as witnessed `personal` memory when auth is saved; those memories are surfaced through `/relationship/profile`.
+The mobile `Know` tab lets the human talk with Cortex through one `Send` action. Cortex replies and learns the message as witnessed `personal` memory when auth is saved; those memories are surfaced through `/relationship/profile`. The same tab can export visible memory and forget selected memory IDs through witnessed tombstones.
 
 Optional hardening:
 

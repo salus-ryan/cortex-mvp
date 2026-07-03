@@ -20,6 +20,8 @@ def test_mobile_files_exist():
     assert "Send" in html
     assert "/relationship/profile" in html
     assert "/relationship/converse" in html
+    assert "/memory/forget" in html
+    assert "Export" in html
 
 
 def test_cortex_mobile_served(tmp_path: Path, monkeypatch):

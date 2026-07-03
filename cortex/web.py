@@ -117,6 +117,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeployService(ROOT).report())
         elif self.path == "/payments/status":
             self._json(200, PaymentService(ROOT).status())
+        elif self.path == "/memory/export":
+            self._json(200, MemoryService(ROOT).export())
         elif self.path == "/auth/status":
             self._json(200, AuthService(ROOT).status())
         elif self.path == "/auth/me":
@@ -189,6 +191,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"status": "refused", "reason": str(exc)})
         elif self.path == "/memory/retrieve":
             self._json(200, {"status": "ok", "records": MemoryService(ROOT).retrieve(str(payload.get("query", "")), payload.get("type"))})
+        elif self.path == "/memory/forget":
+            try:
+                rec = MemoryService(ROOT).forget(str(payload.get("id", "")), payload.get("witness"), str(payload.get("reason", "user request")))
+                self._json(200, {"status": "forgotten", "record": rec, "may_execute": False})
+            except Exception as exc:
+                self._json(400, {"status": "refused", "reason": str(exc), "may_execute": False})
         elif self.path == "/relationship/remember":
             result = RelationshipService(ROOT).remember(str(payload.get("content", "")), payload.get("witness"), str(payload.get("source", "mobile_chat")))
             self._json(200 if result["status"] == "remembered" else 400, result)

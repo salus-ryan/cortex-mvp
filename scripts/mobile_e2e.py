@@ -59,6 +59,7 @@ class MobileE2E:
     def capability_for_path(self, path: str) -> str | None:
         return {
             "/memory/write": "memory:write",
+            "/memory/forget": "memory:write",
             "/relationship/remember": "memory:write",
             "/relationship/converse": "memory:write",
             "/tool/execute": "tool:execute",
