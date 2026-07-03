@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,8 @@ class AuthService:
             "mode": "token" if self.configured() else "dev_open_no_token_configured",
             "capabilities": sorted(CAPABILITIES),
             "protected_paths": dict(sorted(PATH_CAPABILITIES.items())),
+            "signed_intents_required": self.signed_intents_required(),
+            "intent_ttl_seconds": self.intent_ttl_seconds(),
             "may_execute": False,
         }
 
@@ -88,13 +91,16 @@ class AuthService:
             return rec
         allowed_caps = self._allowed_capabilities()
         allowed = "*" in allowed_caps or capability in allowed_caps or capability == "auth:me"
+        intent_decision = self._check_signed_intent(headers, token, capability, path) if allowed and capability != "auth:me" else {"allowed": True, "reason": "not_required"}
+        allowed = allowed and intent_decision["allowed"]
         rec = {
             "allowed": allowed,
             "actor": actor,
             "capability": capability,
             "path": path,
             "token_hash": hashlib.sha256(token.encode()).hexdigest()[:12],
-            "reason": "ok" if allowed else "capability_not_granted",
+            "reason": "ok" if allowed else (intent_decision["reason"] if not intent_decision["allowed"] else "capability_not_granted"),
+            "intent": {k: v for k, v in intent_decision.items() if k != "signature"},
             "may_execute": False,
         }
         self._record("allowed" if allowed else "refused", rec)
@@ -106,6 +112,39 @@ class AuthService:
             return None
         decision = self.check(headers, cap, path)
         return None if decision["allowed"] else {"status": "unauthorized", **decision}
+
+    def signed_intents_required(self) -> bool:
+        return os.environ.get("CORTEX_REQUIRE_SIGNED_INTENTS", "0").lower() in {"1", "true", "yes"}
+
+    def intent_ttl_seconds(self) -> int:
+        try:
+            return int(os.environ.get("CORTEX_INTENT_TTL_SECONDS", "300"))
+        except ValueError:
+            return 300
+
+    def sign_intent(self, token: str, timestamp: str, path: str, capability: str, intent: str) -> str:
+        msg = f"{timestamp}.{path}.{capability}.{intent}".encode()
+        return hmac.new(token.encode(), msg, hashlib.sha256).hexdigest()
+
+    def _check_signed_intent(self, headers: dict[str, str], token: str, capability: str, path: str) -> dict[str, Any]:
+        if not self.signed_intents_required():
+            return {"allowed": True, "reason": "not_required"}
+        timestamp = headers.get("x-cortex-intent-timestamp") or headers.get("X-Cortex-Intent-Timestamp") or ""
+        intent = headers.get("x-cortex-intent") or headers.get("X-Cortex-Intent") or ""
+        signature = headers.get("x-cortex-intent-signature") or headers.get("X-Cortex-Intent-Signature") or ""
+        if not timestamp or not intent or not signature:
+            return {"allowed": False, "reason": "missing_signed_intent"}
+        try:
+            ts = int(timestamp)
+        except ValueError:
+            return {"allowed": False, "reason": "invalid_intent_timestamp"}
+        age = abs(int(time.time()) - ts)
+        if age > self.intent_ttl_seconds():
+            return {"allowed": False, "reason": "expired_signed_intent", "age_seconds": age}
+        expected = self.sign_intent(token, timestamp, path, capability, intent)
+        if not hmac.compare_digest(expected, signature):
+            return {"allowed": False, "reason": "invalid_intent_signature", "age_seconds": age}
+        return {"allowed": True, "reason": "ok", "age_seconds": age, "intent_hash": hashlib.sha256(intent.encode()).hexdigest()[:12]}
 
     def _allowed_capabilities(self) -> set[str]:
         raw = os.environ.get("CORTEX_AUTH_CAPABILITIES", "*").strip()

@@ -87,6 +87,15 @@ Auth is primitive: set `CORTEX_AUTH_TOKEN` to require bearer auth for protected 
 
 Protected capabilities include deploy, patch/build apply, memory write, tool execute, payment checkout, immune quarantine, and self-training.
 
+Optional hardening:
+
+```text
+CORTEX_REQUIRE_SIGNED_INTENTS=1
+CORTEX_INTENT_TTL_SECONDS=300
+```
+
+When enabled, protected POST actions also require a short-lived HMAC signed intent over path, capability, timestamp, and intent JSON.
+
 ## Start local dashboard
 
 ```bash

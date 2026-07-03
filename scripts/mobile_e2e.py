@@ -14,9 +14,12 @@ With token:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -36,18 +39,41 @@ class MobileE2E:
         self.token = token
         self.checks: list[Check] = []
 
-    def headers(self, json_body: bool = False, auth: bool = False) -> dict[str, str]:
+    def headers(self, path: str = "", method: str = "GET", json_body: bool = False, auth: bool = False) -> dict[str, str]:
         h: dict[str, str] = {"user-agent": "cortex-mobile-e2e"}
         if json_body:
             h["content-type"] = "application/json"
         if auth and self.token:
             h["authorization"] = "Bearer " + self.token
             h["x-cortex-actor"] = "mobile-e2e"
+            cap = self.capability_for_path(path)
+            if cap and method.upper() != "GET":
+                ts = str(int(time.time()))
+                intent = json.dumps({"path": path, "method": method.upper(), "actor": "mobile-e2e", "at": ts}, separators=(",", ":"))
+                msg = f"{ts}.{path}.{cap}.{intent}".encode()
+                h["x-cortex-intent-timestamp"] = ts
+                h["x-cortex-intent"] = intent
+                h["x-cortex-intent-signature"] = hmac.new(self.token.encode(), msg, hashlib.sha256).hexdigest()
         return h
+
+    def capability_for_path(self, path: str) -> str | None:
+        return {
+            "/memory/write": "memory:write",
+            "/tool/execute": "tool:execute",
+            "/patch/apply": "patch:apply",
+            "/build/apply": "build:apply",
+            "/deploy/check": "deploy:execute",
+            "/deploy/railway": "deploy:execute",
+            "/deploy/forge": "deploy:execute",
+            "/payments/checkout": "payments:checkout",
+            "/immune/quarantine": "immune:quarantine",
+            "/self-train/collect": "self_train:execute",
+            "/self-train/eval": "self_train:execute",
+        }.get(path)
 
     def request(self, path: str, method: str = "GET", payload: dict[str, Any] | None = None, auth: bool = False) -> tuple[int, str, dict[str, str]]:
         data = json.dumps(payload).encode() if payload is not None else None
-        req = urllib.request.Request(self.base + path, data=data, headers=self.headers(payload is not None, auth), method=method)
+        req = urllib.request.Request(self.base + path, data=data, headers=self.headers(path, method, payload is not None, auth), method=method)
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status, resp.read().decode(), dict(resp.headers)
 

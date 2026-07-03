@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from cortex.auth import AuthService
@@ -35,3 +36,20 @@ def test_protect_path(tmp_path: Path, monkeypatch):
     refusal = svc.protect({}, "/deploy/check")
     assert refusal and refusal["status"] == "unauthorized"
     assert svc.protect({}, "/health") is None
+
+
+def test_signed_intents_optional_hardening(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CORTEX_AUTH_TOKEN", "secret")
+    monkeypatch.setenv("CORTEX_REQUIRE_SIGNED_INTENTS", "1")
+    svc = AuthService(tmp_path)
+    assert svc.protect({"authorization": "Bearer secret"}, "/deploy/check")["reason"] == "missing_signed_intent"
+    ts = str(int(time.time()))
+    intent = '{"path":"/deploy/check","method":"POST"}'
+    sig = svc.sign_intent("secret", ts, "/deploy/check", "deploy:execute", intent)
+    headers = {
+        "authorization": "Bearer secret",
+        "x-cortex-intent-timestamp": ts,
+        "x-cortex-intent": intent,
+        "x-cortex-intent-signature": sig,
+    }
+    assert svc.protect(headers, "/deploy/check") is None
