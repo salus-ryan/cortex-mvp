@@ -188,6 +188,20 @@ class OAuthService:
         self._record("session_logout", {"session_hash": session_hash, "existed": existed})
         return {"status": "logged_out", "existed": existed, "may_execute": False}
 
+    def authorize(self, headers: dict[str, str], capability: str, path: str = "") -> dict[str, Any]:
+        if os.environ.get("CORTEX_ENABLE_OAUTH_AUTH", "0").lower() not in {"1", "true", "yes"}:
+            return {"allowed": False, "reason": "oauth_auth_disabled", "may_execute": False}
+        if os.environ.get("CORTEX_REQUIRE_SIGNED_INTENTS", "0").lower() in {"1", "true", "yes"}:
+            return {"allowed": False, "reason": "oauth_signed_intent_not_supported", "may_execute": False}
+        decision = self.check_session(self._bearer(headers.get("authorization") or headers.get("Authorization") or ""))
+        if not decision["allowed"]:
+            return decision
+        caps = self.allowed_capabilities()
+        if "*" not in caps and capability not in caps and capability != "auth:me":
+            return {"allowed": False, "reason": "oauth_capability_not_granted", "capability": capability, "path": path, "may_execute": False}
+        self._record("session_authorized", {"session_hash": decision.get("session_hash"), "capability": capability, "path": path})
+        return {"allowed": True, "reason": "ok", "capability": capability, "path": path, "session_hash": decision.get("session_hash"), "may_execute": False}
+
     def endpoints(self) -> dict[str, str]:
         endpoints = {
             "authorization_endpoint": self.authorization_endpoint(),
@@ -233,6 +247,10 @@ class OAuthService:
             return int(os.environ.get("CORTEX_OIDC_SESSION_TTL_SECONDS", "28800"))
         except ValueError:
             return 28800
+
+    def allowed_capabilities(self) -> set[str]:
+        raw = os.environ.get("CORTEX_OIDC_CAPABILITIES", "auth:me").strip()
+        return {x.strip() for x in raw.split(",") if x.strip()}
 
     def _subject_allowed(self, user: dict[str, Any]) -> bool:
         allowed = self.allowed_subjects()

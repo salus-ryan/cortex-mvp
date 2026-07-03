@@ -54,3 +54,26 @@ def test_oauth_allowed_subjects(tmp_path: Path, monkeypatch):
     assert refused["status"] == "refused"
     accepted = svc.create_session({"sub": "user-3", "email": "allowed@example.test"})
     assert accepted["status"] == "authenticated"
+
+
+def test_oauth_authorize_is_explicit_and_narrow(tmp_path: Path, monkeypatch):
+    svc = OAuthService(tmp_path)
+    created = svc.create_session({"sub": "user-1", "email": "u@example.test"})
+    headers = {"authorization": "Bearer " + created["session_token"]}
+    assert svc.authorize(headers, "memory:write", "/memory/write")["reason"] == "oauth_auth_disabled"
+    monkeypatch.setenv("CORTEX_ENABLE_OAUTH_AUTH", "1")
+    monkeypatch.setenv("CORTEX_OIDC_CAPABILITIES", "memory:write")
+    ok = svc.authorize(headers, "memory:write", "/memory/write")
+    assert ok["allowed"] is True
+    denied = svc.authorize(headers, "deploy:execute", "/deploy/check")
+    assert denied["reason"] == "oauth_capability_not_granted"
+
+
+def test_oauth_authorize_refuses_when_signed_intents_required(tmp_path: Path, monkeypatch):
+    svc = OAuthService(tmp_path)
+    created = svc.create_session({"sub": "user-1"})
+    headers = {"authorization": "Bearer " + created["session_token"]}
+    monkeypatch.setenv("CORTEX_ENABLE_OAUTH_AUTH", "1")
+    monkeypatch.setenv("CORTEX_OIDC_CAPABILITIES", "memory:write")
+    monkeypatch.setenv("CORTEX_REQUIRE_SIGNED_INTENTS", "1")
+    assert svc.authorize(headers, "memory:write", "/memory/write")["reason"] == "oauth_signed_intent_not_supported"

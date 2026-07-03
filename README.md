@@ -98,6 +98,8 @@ CORTEX_OIDC_ISSUER=https://issuer.example
 # or set CORTEX_OIDC_AUTHORIZATION_ENDPOINT directly
 CORTEX_OIDC_ALLOWED_SUBJECTS=sub-or-email-or-username,another-subject
 CORTEX_OIDC_SESSION_TTL_SECONDS=28800
+CORTEX_ENABLE_OAUTH_AUTH=1
+CORTEX_OIDC_CAPABILITIES=auth:me,memory:write
 ```
 
 Current OIDC surface starts the provider login with PKCE and records state:
@@ -111,7 +113,7 @@ curl "$BASE/oauth/me" -H 'authorization: Bearer oauth_session_value'
 curl -X POST "$BASE/oauth/logout" -H 'authorization: Bearer oauth_session_value'
 ```
 
-OAuth identifies a human; it does not grant execution authority by itself. Sessions are local Cortex sessions stored hashed in `runtime/oauth_sessions.json`, with state/PKCE material in `runtime/oauth_states.json` and auth events in `ledger/auth.jsonl`.
+OAuth identifies a human; it does not grant execution authority by itself unless `CORTEX_ENABLE_OAUTH_AUTH=1` is set with narrow `CORTEX_OIDC_CAPABILITIES`. Sessions are local Cortex sessions stored hashed in `runtime/oauth_sessions.json`, with state/PKCE material in `runtime/oauth_states.json` and auth events in `ledger/auth.jsonl`. OAuth-backed protected actions currently refuse when `CORTEX_REQUIRE_SIGNED_INTENTS=1`, pending a separate signed-intent bridge.
 
 Optional hardening:
 

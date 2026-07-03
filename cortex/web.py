@@ -203,6 +203,12 @@ class Handler(BaseHTTPRequestHandler):
 
         auth_refusal = AuthService(ROOT).protect(dict(self.headers), self.path)
         if auth_refusal:
+            oauth_decision = OAuthService(ROOT).authorize(dict(self.headers), PATH_CAPABILITIES.get(self.path, ""), self.path)
+            if oauth_decision["allowed"]:
+                auth_refusal = None
+            else:
+                auth_refusal["oauth"] = oauth_decision
+        if auth_refusal:
             self._json(int(auth_refusal.pop("http_status", 401)), auth_refusal)
             return
 

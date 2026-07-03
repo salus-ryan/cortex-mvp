@@ -33,10 +33,15 @@ def serve(monkeypatch, tmp_path):
 
 
 def post(url, payload):
+    return post_with_headers(url, payload, {})
+
+
+def post_with_headers(url, payload, headers):
+    merged = {"content-type": "application/json", **headers}
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),
-        headers={"content-type": "application/json"},
+        headers=merged,
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=5) as r:
@@ -44,7 +49,12 @@ def post(url, payload):
 
 
 def get(url):
-    with urllib.request.urlopen(url, timeout=5) as r:
+    return get_with_headers(url, {})
+
+
+def get_with_headers(url, headers):
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    with urllib.request.urlopen(req, timeout=5) as r:
         return r.status, json.loads(r.read().decode())
 
 
