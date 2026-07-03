@@ -5,70 +5,80 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cortex Forge Control Room</title>
   <style>
-    :root { color-scheme: dark; --bg:#0b0f14; --panel:#121923; --muted:#8fa3b8; --ok:#3ddc97; --warn:#ffd166; --bad:#ef476f; --line:#263241; --fg:#e6edf3; }
-    * { box-sizing: border-box; } body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-    header { padding:18px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
-    h1 { margin:0; font-size:20px; } .sub { color:var(--muted); font-size:12px; }
-    main { padding:20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
-    section { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 6px 28px #0004; }
-    h2 { margin:0 0 10px; font-size:16px; } pre { white-space:pre-wrap; word-break:break-word; background:#081018; border:1px solid var(--line); border-radius:10px; padding:10px; max-height:340px; overflow:auto; }
-    button { background:#203044; color:var(--fg); border:1px solid #3a4b60; border-radius:10px; padding:8px 11px; cursor:pointer; margin:4px 4px 4px 0; }
-    button:hover { background:#2a3d55; } input { background:#081018; color:var(--fg); border:1px solid #3a4b60; border-radius:8px; padding:8px; width:100%; margin:4px 0 8px; }
-    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; } .pill { padding:3px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
-    .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); } .small { font-size:12px; color:var(--muted); }
+    :root{color-scheme:dark;--bg:#0b0f14;--card:#121923;--line:#263241;--fg:#e6edf3;--muted:#8fa3b8;--ok:#3ddc97;--bad:#ef476f;--warn:#ffd166}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}
+    main{max-width:880px;margin:0 auto;padding:22px} header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}
+    h1{margin:0;font-size:24px} h2{margin:0 0 10px;font-size:16px}.muted{color:var(--muted);font-size:13px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 8px 30px #0003}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.stat{padding:12px;border:1px solid var(--line);border-radius:12px;background:#0d141d}.label{color:var(--muted);font-size:12px}.value{font-size:18px;margin-top:4px}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+    button{border:1px solid #3a4b60;background:#203044;color:var(--fg);border-radius:12px;padding:11px 13px;cursor:pointer;font-weight:650}button:hover{background:#2a3d55}.danger{border-color:#6b2840;background:#351724}.primary{background:#1d4f3d;border-color:#35775d}
+    input{width:100%;background:#081018;color:var(--fg);border:1px solid #3a4b60;border-radius:10px;padding:10px;margin:6px 0}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.pill{border:1px solid var(--line);border-radius:999px;padding:4px 9px;color:var(--muted)}
+    pre{white-space:pre-wrap;word-break:break-word;background:#081018;border:1px solid var(--line);border-radius:12px;padding:12px;max-height:360px;overflow:auto}details{margin-top:10px}summary{cursor:pointer;color:var(--muted)}
   </style>
 </head>
 <body>
-<header>
-  <div><h1>🜁 Cortex Forge Control Room</h1><div class="sub">self-owned app platform · witness gated · allowlisted actions</div></div>
-  <div class="row"><span id="heartbeat" class="pill">loading</span><button onclick="refreshAll()">Refresh</button></div>
-</header>
 <main>
-  <section><h2>Forge Status</h2><div id="forge-summary" class="small"></div><pre id="forge">loading…</pre></section>
-  <section><h2>Apps</h2><div id="apps-list"></div><pre id="apps">loading…</pre></section>
-  <section><h2>Selected App</h2><input id="app" value="cortex" /><div class="row"><button onclick="appStatus()">Status</button><button onclick="appHealth()">Health</button><button onclick="appLogs()">Logs</button><button onclick="appCheck()">Check</button></div><pre id="appout">choose an action…</pre></section>
-  <section><h2>Witness Actions</h2><input id="token" placeholder="Forge token (if configured)" type="password" /><input id="witness" placeholder="witness name" /><label class="small"><input id="confirmed" type="checkbox" /> confirmed</label><div class="row"><button onclick="mutate('update')">Update</button><button onclick="mutate('deploy')">Deploy</button><button onclick="mutate('rollback')">Rollback</button></div><pre id="mutate">mutations require witness + confirmation</pre></section>
-  <section><h2>Latest Job</h2><div class="row"><button onclick="latestJob()">Latest</button><button onclick="pollJob()">Poll job id</button></div><input id="jobid" placeholder="job id" /><pre id="job">loading…</pre></section>
-  <section><h2>Platform Notes</h2><pre>Allowed actions only:
-- git pull --ff-only
-- forge/deploy.sh
-- forge/rollback.sh
-- docker logs/inspect
+  <header>
+    <div><h1>Cortex Forge</h1><div class="muted">simple control room · witness gated</div></div>
+    <div class="row"><span id="heartbeat" class="pill">loading</span><button onclick="refresh()">Refresh</button></div>
+  </header>
 
-No arbitrary shell. No secret display. Mutations should use Authorization bearer token when configured.</pre></section>
+  <section class="card">
+    <h2>Now</h2>
+    <div class="grid">
+      <div class="stat"><div class="label">Forge</div><div id="forgeState" class="value">—</div></div>
+      <div class="stat"><div class="label">Docker</div><div id="dockerState" class="value">—</div></div>
+      <div class="stat"><div class="label">App</div><div id="appState" class="value">cortex</div></div>
+      <div class="stat"><div class="label">Latest job</div><div id="jobState" class="value">—</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Operate</h2>
+    <input id="app" value="cortex" aria-label="app name" />
+    <div class="row">
+      <button class="primary" onclick="health()">Health</button>
+      <button onclick="logs()">Logs</button>
+      <button onclick="check()">Check</button>
+    </div>
+    <pre id="out">Ready.</pre>
+  </section>
+
+  <section class="card">
+    <h2>Change</h2>
+    <div class="muted">Mutations require witness + confirmation. No arbitrary shell.</div>
+    <input id="token" placeholder="Forge token, if configured" type="password" />
+    <input id="witness" placeholder="witness name" />
+    <label class="muted"><input id="confirmed" type="checkbox" /> confirmed</label>
+    <div class="row" style="margin-top:8px">
+      <button onclick="mutate('update')">Update</button>
+      <button class="primary" onclick="mutate('deploy')">Deploy</button>
+      <button class="danger" onclick="mutate('rollback')">Rollback</button>
+    </div>
+    <pre id="change">No change requested.</pre>
+  </section>
+
+  <section class="card">
+    <h2>Job</h2>
+    <div class="row"><input id="jobid" placeholder="job id or latest" style="flex:1;min-width:220px"/><button onclick="job()">View</button></div>
+    <pre id="job">No job loaded.</pre>
+  </section>
+
+  <details class="card">
+    <summary>Raw platform detail</summary>
+    <pre id="raw">loading…</pre>
+  </details>
 </main>
 <script>
-const $ = id => document.getElementById(id);
-function pretty(x){ return JSON.stringify(x,null,2); }
-async function api(path, opts={}){
-  const headers = opts.headers || {};
-  if(opts.body) headers['content-type']='application/json';
-  if($('token').value) headers['authorization']='Bearer '+$('token').value;
-  const r = await fetch(path, {...opts, headers});
-  const txt = await r.text(); let data; try{ data=JSON.parse(txt); }catch{ data={raw:txt}; }
-  if(!r.ok) data._http_status = r.status;
-  return data;
-}
-async function refreshAll(){
-  try{
-    const s=await api('/forge/status'); $('forge').textContent=pretty(s); $('heartbeat').textContent=s.status||'ok'; $('heartbeat').className='pill ok';
-    $('forge-summary').innerHTML=`docker: <b class="${s.docker_available?'ok':'bad'}">${s.docker_available}</b> · git: <b class="${s.git_available?'ok':'bad'}">${s.git_available}</b>`;
-    const a=await api('/forge/apps'); $('apps').textContent=pretty(a); $('apps-list').innerHTML=Object.keys(a.apps||{}).map(n=>`<button onclick="$('app').value='${n}';appStatus()">${n}</button>`).join('');
-    await latestJob();
-  }catch(e){ $('heartbeat').textContent='error'; $('heartbeat').className='pill bad'; $('forge').textContent=String(e); }
-}
-async function appStatus(){ $('appout').textContent=pretty(await api(`/forge/apps/${$('app').value}/status`)); }
-async function appHealth(){ $('appout').textContent=pretty(await api(`/forge/apps/${$('app').value}/health`)); }
-async function appLogs(){ $('appout').textContent=pretty(await api(`/forge/apps/${$('app').value}/logs`)); }
-async function appCheck(){ $('appout').textContent=pretty(await api(`/forge/apps/${$('app').value}/check`)); }
-async function mutate(action){
-  const body={witness:$('witness').value, confirmed:$('confirmed').checked, async:true};
-  const data=await api(`/forge/apps/${$('app').value}/${action}`, {method:'POST', body:JSON.stringify(body)});
-  $('mutate').textContent=pretty(data); if(data.id) $('jobid').value=data.id;
-}
-async function latestJob(){ $('job').textContent=pretty(await api('/forge/job?id=latest')); }
-async function pollJob(){ const id=$('jobid').value||'latest'; $('job').textContent=pretty(await api(id==='latest'?'/forge/job?id=latest':`/forge/jobs/${id}`)); }
-refreshAll(); setInterval(refreshAll, 15000);
+const $=id=>document.getElementById(id); const pretty=x=>JSON.stringify(x,null,2);
+async function api(path,opts={}){const h=opts.headers||{}; if(opts.body)h['content-type']='application/json'; if($('token')?.value)h.authorization='Bearer '+$('token').value; const r=await fetch(path,{...opts,headers:h}); const t=await r.text(); let d; try{d=JSON.parse(t)}catch{d={raw:t}} if(!r.ok)d._http_status=r.status; return d}
+function set(id,text,cls=''){const e=$(id); e.textContent=text; e.className='value '+cls}
+async function refresh(){try{const s=await api('/forge/status'); $('raw').textContent=pretty(s); $('heartbeat').textContent=s.status||'ok'; $('heartbeat').className='pill ok'; set('forgeState',s.status||'ok','ok'); set('dockerState',String(!!s.docker_available),s.docker_available?'ok':'bad'); const j=await api('/forge/job?id=latest'); set('jobState',j.status||'none',j.status==='ok'?'ok':(j.status==='running'?'warn':''));}catch(e){$('heartbeat').textContent='error';$('heartbeat').className='pill bad';$('raw').textContent=String(e)}}
+async function health(){const app=$('app').value||'cortex'; $('appState').textContent=app; $('out').textContent=pretty(await api(`/forge/apps/${app}/health`))}
+async function logs(){const app=$('app').value||'cortex'; $('out').textContent=pretty(await api(`/forge/apps/${app}/logs`))}
+async function check(){const app=$('app').value||'cortex'; $('out').textContent=pretty(await api(`/forge/apps/${app}/check`))}
+async function mutate(action){const app=$('app').value||'cortex'; const body={witness:$('witness').value,confirmed:$('confirmed').checked,async:true}; const d=await api(`/forge/apps/${app}/${action}`,{method:'POST',body:JSON.stringify(body)}); $('change').textContent=pretty(d); if(d.id)$('jobid').value=d.id; await refresh()}
+async function job(){const id=$('jobid').value||'latest'; $('job').textContent=pretty(await api(id==='latest'?'/forge/job?id=latest':`/forge/jobs/${id}`))}
+refresh(); setInterval(refresh,15000);
 </script>
 </body>
 </html>
