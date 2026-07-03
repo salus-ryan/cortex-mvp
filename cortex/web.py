@@ -19,6 +19,7 @@ from cortex.immune import ImmuneService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
+from cortex.loop import CortexLoop
 from cortex.oauth import OAuthService
 from cortex.patch_service import PatchService
 from cortex.payments import PaymentService
@@ -179,6 +180,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AwarenessService(ROOT).latest())
         elif self.path == "/step/latest":
             self._json(200, CortexStepFunction(ROOT).latest())
+        elif self.path == "/loop/latest":
+            self._json(200, CortexLoop(ROOT).latest())
         elif self.path == "/model/proposals":
             self._json(200, TrustBoundaryService(ROOT).latest())
         elif self.path == "/witnesses":
@@ -190,7 +193,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl", "loops.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -269,6 +272,14 @@ class Handler(BaseHTTPRequestHandler):
                 context=dict(payload.get("context", {}) or {}),
             )
             self._json(200 if result["status"] == "stepped" else 400, result)
+        elif self.path == "/loop":
+            result = CortexLoop(ROOT).run(
+                goal=str(payload.get("goal", payload.get("task", ""))),
+                authority=str(payload.get("authority", "interpret")),
+                max_steps=int(payload.get("max_steps", 3)),
+                context=dict(payload.get("context", {}) or {}),
+            )
+            self._json(200 if result["status"] == "looped" else 400, result)
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)

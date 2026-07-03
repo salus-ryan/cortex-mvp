@@ -210,6 +210,23 @@ def test_web_oauth_status_and_login(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_loop(monkeypatch, tmp_path):
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        code, data = post(base + "/loop", {"goal": "Plan bounded safe improvements", "authority": "interpret", "max_steps": 2})
+        assert code == 200
+        assert data["status"] == "looped"
+        assert data["may_execute"] is False
+        code, latest = get(base + "/loop/latest")
+        assert code == 200
+        assert latest["initial_goal"] == "Plan bounded safe improvements"
+        code, ledger = get(base + "/ledger/loops.jsonl")
+        assert code == 200
+        assert ledger["records"]
+    finally:
+        server.shutdown()
+
+
 def test_web_step_function(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:
