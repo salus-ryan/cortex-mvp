@@ -38,6 +38,29 @@ def test_protect_path(tmp_path: Path, monkeypatch):
     assert svc.protect({}, "/health") is None
 
 
+def test_auth_rate_limits_failures(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CORTEX_AUTH_TOKEN", "secret")
+    monkeypatch.setenv("CORTEX_AUTH_MAX_FAILURES", "2")
+    monkeypatch.setenv("CORTEX_AUTH_WINDOW_SECONDS", "60")
+    svc = AuthService(tmp_path)
+    headers = {"authorization": "Bearer wrong", "x-forwarded-for": "203.0.113.9"}
+    assert svc.protect(headers, "/deploy/check")["reason"] == "missing_or_invalid_bearer_token"
+    assert svc.protect(headers, "/deploy/check")["reason"] == "missing_or_invalid_bearer_token"
+    limited = svc.protect(headers, "/deploy/check")
+    assert limited["reason"] == "auth_rate_limited"
+    assert limited["http_status"] == 429
+
+
+def test_auth_success_clears_failures(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("CORTEX_AUTH_TOKEN", "secret")
+    svc = AuthService(tmp_path)
+    bad = {"authorization": "Bearer wrong", "x-forwarded-for": "203.0.113.10"}
+    good = {"authorization": "Bearer secret", "x-forwarded-for": "203.0.113.10"}
+    assert svc.protect(bad, "/deploy/check")
+    assert svc.protect(good, "/deploy/check") is None
+    assert svc._read_failures() == {}
+
+
 def test_signed_intents_optional_hardening(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CORTEX_AUTH_TOKEN", "secret")
     monkeypatch.setenv("CORTEX_REQUIRE_SIGNED_INTENTS", "1")

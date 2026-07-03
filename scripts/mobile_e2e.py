@@ -106,7 +106,7 @@ class MobileE2E:
         self.expect("awareness", code == 200 and aware.get("status") == "aware" and aware.get("self_model", {}).get("is_pid1") is True, code=code, status=aware.get("status"), is_pid1=aware.get("self_model", {}).get("is_pid1"))
         code, body, _ = self.request("/auth/status")
         auth = json.loads(body)
-        self.expect("auth_status", code == 200 and "protected_paths" in auth, code=code, configured=auth.get("configured"), mode=auth.get("mode"), protected_paths=len(auth.get("protected_paths", {})))
+        self.expect("auth_status", code == 200 and "protected_paths" in auth, code=code, configured=auth.get("configured"), mode=auth.get("mode"), protected_paths=len(auth.get("protected_paths", {})), rate_limit=auth.get("rate_limit"), signed_intents_required=auth.get("signed_intents_required"))
 
     def check_auth_boundary(self) -> None:
         try:

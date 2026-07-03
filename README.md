@@ -92,6 +92,8 @@ Optional hardening:
 ```text
 CORTEX_REQUIRE_SIGNED_INTENTS=1
 CORTEX_INTENT_TTL_SECONDS=300
+CORTEX_AUTH_MAX_FAILURES=8
+CORTEX_AUTH_WINDOW_SECONDS=60
 ```
 
 When enabled, protected POST actions also require a short-lived HMAC signed intent over path, capability, timestamp, and intent JSON.

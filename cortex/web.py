@@ -149,7 +149,7 @@ class Handler(BaseHTTPRequestHandler):
 
         auth_refusal = AuthService(ROOT).protect(dict(self.headers), self.path)
         if auth_refusal:
-            self._json(401, auth_refusal)
+            self._json(int(auth_refusal.pop("http_status", 401)), auth_refusal)
             return
 
         pipeline = InvocationPipeline(ROOT)
