@@ -63,9 +63,16 @@ FORGE_TOKEN='choose-a-token' \
 python -m cortex_forge.server
 ```
 
+Open the dashboard:
+
+```text
+http://127.0.0.1:8765/ui
+```
+
 Endpoints:
 
 ```http
+GET  /ui
 GET  /forge/status
 GET  /forge/apps
 GET  /forge/apps/{app}/status

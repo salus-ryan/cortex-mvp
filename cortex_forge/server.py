@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import mimetypes
 import subprocess
 import threading
 import urllib.request
@@ -292,6 +293,17 @@ def make_handler(state: ForgeState, token: str | None):
             self.end_headers()
             self.wfile.write(body)
 
+        def _file(self, path: Path) -> None:
+            if not path.exists() or not path.is_file():
+                self._json(404, {"status": "not_found"})
+                return
+            body = path.read_bytes()
+            self.send_response(200)
+            self.send_header("content-type", mimetypes.guess_type(str(path))[0] or "application/octet-stream")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def _body(self) -> dict[str, Any]:
             length = int(self.headers.get("content-length", "0") or "0")
             if not length:
@@ -305,7 +317,12 @@ def make_handler(state: ForgeState, token: str | None):
             return self.headers.get("authorization") == f"Bearer {token}"
 
         def do_GET(self) -> None:  # noqa: N802
-            if self.path in {"/", "/forge/status"}:
+            if self.path in {"/ui", "/dashboard"}:
+                self._file(Path(__file__).parent / "static" / "index.html")
+            elif self.path.startswith("/static/"):
+                rel = self.path.removeprefix("/static/").split("?", 1)[0]
+                self._file(Path(__file__).parent / "static" / rel)
+            elif self.path in {"/", "/forge/status"}:
                 self._json(200, state.status())
             elif self.path == "/forge/apps":
                 self._json(200, {"status": "ok", "apps": state.apps(), "may_execute": False})
