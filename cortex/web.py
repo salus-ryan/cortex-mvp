@@ -29,6 +29,7 @@ from cortex.sacred import ANTI_IDOLATRY
 from cortex.self_train import SelfTrainer
 from cortex.services import InvocationPipeline
 from cortex.state_service import StateService
+from cortex.step_function import CortexStepFunction
 from cortex.tool_algebra import ToolAlgebra
 from cortex.tool_gateway import ToolGateway
 from cortex.trust_boundary import TrustBoundaryService
@@ -176,6 +177,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AwarenessService(ROOT).state())
         elif self.path == "/awareness/latest":
             self._json(200, AwarenessService(ROOT).latest())
+        elif self.path == "/step/latest":
+            self._json(200, CortexStepFunction(ROOT).latest())
         elif self.path == "/model/proposals":
             self._json(200, TrustBoundaryService(ROOT).latest())
         elif self.path == "/witnesses":
@@ -187,7 +190,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -259,6 +262,13 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200 if rec["status"] == "ready_for_human_confirmation" else 403, rec)
         elif self.path == "/oauth/logout":
             self._json(200, OAuthService(ROOT).logout(dict(self.headers)))
+        elif self.path == "/step":
+            result = CortexStepFunction(ROOT).step(
+                goal=str(payload.get("goal", payload.get("task", ""))),
+                authority=str(payload.get("authority", "interpret")),
+                context=dict(payload.get("context", {}) or {}),
+            )
+            self._json(200 if result["status"] == "stepped" else 400, result)
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)

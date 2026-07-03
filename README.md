@@ -143,7 +143,7 @@ curl "$BASE/ledger/model-proposals.jsonl"
 curl "$BASE/ledger/next-steps.jsonl"
 ```
 
-`/model/propose` records external model output as an `untrusted_suggestion`, runs immune scanning, writes `ledger/model-proposals.jsonl`, and always returns `may_execute: false`. `/model/next-step` validates a proposal/action pairing and returns the next lawful checkpoint requirements without executing. Material actions must still pass auth, signed intent, Guardian, witness, and ledger gates. If `CORTEX_REQUIRE_PROPOSAL_IDS=1`, material endpoints such as `/memory/write`, `/tool/execute`, `/patch/apply`, `/build/apply`, deploy, checkout, quarantine, self-training, and state import reject requests that do not include a matching `proposal_id`.
+`/model/propose` records external model output as an `untrusted_suggestion`, runs immune scanning, writes `ledger/model-proposals.jsonl`, and always returns `may_execute: false`. `/model/next-step` validates a proposal/action pairing and returns the next lawful checkpoint requirements without executing. `/step` runs one governed cycle: observe, propose, immune-scan, record proposal, compute next checkpoint when applicable, write project memory, log `ledger/steps.jsonl`, and stop with `may_execute: false`. Material actions must still pass auth, signed intent, Guardian, witness, and ledger gates. If `CORTEX_REQUIRE_PROPOSAL_IDS=1`, material endpoints such as `/memory/write`, `/tool/execute`, `/patch/apply`, `/build/apply`, deploy, checkout, quarantine, self-training, and state import reject requests that do not include a matching `proposal_id`.
 
 ## Start local dashboard
 
@@ -197,6 +197,12 @@ curl -X POST "$BASE/memory/write" \
 
 curl -X POST "$BASE/planner/reflect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/planner/choose-next" -H 'content-type: application/json' -d '{}'
+
+curl -X POST "$BASE/step" \
+  -H 'content-type: application/json' \
+  -d '{"goal":"Plan the next safe improvement","authority":"interpret"}'
+curl "$BASE/step/latest"
+curl "$BASE/ledger/steps.jsonl"
 
 curl -X POST "$BASE/deliberate" \
   -H 'content-type: application/json' \
