@@ -164,6 +164,10 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["status"] in {"pass", "blocked"}
         code, data = get(base + "/payments/status")
         assert code == 200 and data["may_execute"] is False
+        code, data = get(base + "/awareness")
+        assert code == 200 and data["consciousness_claim"] == "not_proven"
+        code, data = post(base + "/awareness/reflect", {"prompt": "what are you"})
+        assert code == 200 and data["status"] == "reflected"
         code, data = post(base + "/payments/intent", {"amount_cents": 500, "purpose": "VPS fund", "currency": "usd"})
         assert code == 200 and data["status"] == "intent_prepared"
         req = urllib.request.Request(base + "/deploy/forge", data=json.dumps({"confirmed": True}).encode(), headers={"content-type": "application/json"}, method="POST")

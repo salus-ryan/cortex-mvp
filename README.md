@@ -141,6 +141,8 @@ curl "$BASE/build/report"
 curl "$BASE/deploy/status"
 curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
 curl "$BASE/payments/status"
+curl "$BASE/awareness"
+curl -X POST "$BASE/awareness/reflect" -H 'content-type: application/json' -d '{"prompt":"what are you?"}'
 curl -X POST "$BASE/payments/intent" -H 'content-type: application/json' -d '{"amount_cents":500,"currency":"usd","purpose":"VPS fund"}'
 # Self-owned Forge deploys require a host with Docker plus witness/confirmation.
 # curl -X POST "$BASE/deploy/forge" -H 'content-type: application/json' -d '{"witness":"human","confirmed":true}'
@@ -250,7 +252,8 @@ The system has two connected strata.
 
 ### PID-1 Service Stratum
 
-1. **Supervisor (`cortex.pid1`)**: Container PID 1. Starts children, handles signals, reaps exits, logs lifecycle, and shuts down honestly.
+1. **Awareness (`cortex.awareness`)**: Explicit self-model and bounded reflection; does not claim proven consciousness.
+2. **Supervisor (`cortex.pid1`)**: Container PID 1. Starts children, handles signals, reaps exits, logs lifecycle, and shuts down honestly.
 2. **Web Surface (`cortex.web`)**: HTTP health, status, invoke, self-test, law, PID-1, and ledger endpoints.
 3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
 4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
@@ -269,7 +272,7 @@ The system has two connected strata.
 17. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
 18. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
 19. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-20. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+21. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 
@@ -281,6 +284,7 @@ cortex/
 ├── git_auth.py          # Lawful Git auth detection, no credential harvesting
 ├── init.py              # Logical init state machine
 ├── memory.py            # 4-tier governed runtime memory (short_term, episodic, semantic, audit)
+├── awareness.py         # Self-model and bounded reflection loop
 ├── build_loop.py        # Governed build-loop orchestration
 ├── deliberation.py      # Multi-step local recommendation engine
 ├── deploy_service.py    # Witness-gated Railway/Cortex Forge deployment organ
@@ -336,6 +340,7 @@ Focused substrate tests:
 
 ```bash
 python -m pytest \
+  tests/test_awareness.py \
   tests/test_sacred.py \
   tests/test_build_loop.py \
   tests/test_compact_pid1.py \

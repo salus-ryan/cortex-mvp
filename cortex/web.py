@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from cortex.awareness import AwarenessService
 from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
 from cortex.deploy_service import DeployService
@@ -108,6 +109,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeployService(ROOT).report())
         elif self.path == "/payments/status":
             self._json(200, PaymentService(ROOT).status())
+        elif self.path == "/awareness":
+            self._json(200, AwarenessService(ROOT).state())
+        elif self.path == "/awareness/latest":
+            self._json(200, AwarenessService(ROOT).latest())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -117,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -217,6 +222,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/payments/checkout":
             result = PaymentService(ROOT).checkout(int(payload.get("amount_cents", 0)), str(payload.get("purpose", "")), str(payload.get("currency", "usd")), payload.get("witness"), bool(payload.get("confirmed", False)))
             self._json(200 if result["status"] == "checkout_created" else 403, result)
+        elif self.path == "/awareness/reflect":
+            self._json(200, AwarenessService(ROOT).reflect(str(payload.get("prompt", ""))))
         else:
             self._json(404, {"status": "not_found"})
 
