@@ -265,6 +265,11 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200 if rec["status"] == "ready_for_human_confirmation" else 403, rec)
         elif self.path == "/oauth/logout":
             self._json(200, OAuthService(ROOT).logout(dict(self.headers)))
+        elif self.path == "/oauth/intent":
+            path = str(payload.get("path", ""))
+            capability = str(payload.get("capability", PATH_CAPABILITIES.get(path, "")))
+            result = OAuthService(ROOT).intent_headers(dict(self.headers), path, capability, dict(payload.get("intent", {}) or {}))
+            self._json(200 if result["status"] == "intent_prepared" else 403, result)
         elif self.path == "/step":
             result = CortexStepFunction(ROOT).step(
                 goal=str(payload.get("goal", payload.get("task", ""))),

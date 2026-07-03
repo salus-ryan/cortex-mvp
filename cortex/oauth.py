@@ -191,16 +191,49 @@ class OAuthService:
     def authorize(self, headers: dict[str, str], capability: str, path: str = "") -> dict[str, Any]:
         if os.environ.get("CORTEX_ENABLE_OAUTH_AUTH", "0").lower() not in {"1", "true", "yes"}:
             return {"allowed": False, "reason": "oauth_auth_disabled", "may_execute": False}
-        if os.environ.get("CORTEX_REQUIRE_SIGNED_INTENTS", "0").lower() in {"1", "true", "yes"}:
-            return {"allowed": False, "reason": "oauth_signed_intent_not_supported", "may_execute": False}
-        decision = self.check_session(self._bearer(headers.get("authorization") or headers.get("Authorization") or ""))
+        session_value = self._bearer(headers.get("authorization") or headers.get("Authorization") or "")
+        decision = self.check_session(session_value)
         if not decision["allowed"]:
             return decision
         caps = self.allowed_capabilities()
         if "*" not in caps and capability not in caps and capability != "auth:me":
             return {"allowed": False, "reason": "oauth_capability_not_granted", "capability": capability, "path": path, "may_execute": False}
-        self._record("session_authorized", {"session_hash": decision.get("session_hash"), "capability": capability, "path": path})
-        return {"allowed": True, "reason": "ok", "capability": capability, "path": path, "session_hash": decision.get("session_hash"), "may_execute": False}
+        intent_decision = self._check_signed_intent(headers, session_value, capability, path)
+        if not intent_decision["allowed"]:
+            return {**intent_decision, "capability": capability, "path": path, "may_execute": False}
+        self._record("session_authorized", {"session_hash": decision.get("session_hash"), "capability": capability, "path": path, "intent": intent_decision})
+        return {"allowed": True, "reason": "ok", "capability": capability, "path": path, "session_hash": decision.get("session_hash"), "intent": intent_decision, "may_execute": False}
+
+    def intent_headers(self, headers: dict[str, str], path: str, capability: str, intent: dict[str, Any] | None = None) -> dict[str, Any]:
+        session_value = self._bearer(headers.get("authorization") or headers.get("Authorization") or "")
+        decision = self.check_session(session_value)
+        if not decision["allowed"]:
+            return {"status": "refused", **decision}
+        caps = self.allowed_capabilities()
+        if "*" not in caps and capability not in caps and capability != "auth:me":
+            return {"status": "refused", "reason": "oauth_capability_not_granted", "capability": capability, "path": path, "may_execute": False}
+        timestamp = str(int(time.time()))
+        payload = {"method": "POST", "path": path, "capability": capability, **dict(intent or {})}
+        intent_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        signature = self.sign_intent(session_value, timestamp, path, capability, intent_json)
+        result = {
+            "status": "intent_prepared",
+            "path": path,
+            "capability": capability,
+            "headers": {
+                "x-cortex-intent-timestamp": timestamp,
+                "x-cortex-intent": intent_json,
+                "x-cortex-intent-signature": signature,
+            },
+            "may_execute": False,
+        }
+        self._record("intent_prepared", {"session_hash": decision.get("session_hash"), "path": path, "capability": capability, "intent_hash": self._hash(intent_json)})
+        return result
+
+    def sign_intent(self, session_value: str, timestamp: str, path: str, capability: str, intent: str) -> str:
+        import hmac
+        msg = f"{timestamp}.{path}.{capability}.{intent}".encode()
+        return hmac.new(session_value.encode(), msg, hashlib.sha256).hexdigest()
 
     def endpoints(self) -> dict[str, str]:
         endpoints = {
@@ -251,6 +284,54 @@ class OAuthService:
     def allowed_capabilities(self) -> set[str]:
         raw = os.environ.get("CORTEX_OIDC_CAPABILITIES", "auth:me").strip()
         return {x.strip() for x in raw.split(",") if x.strip()}
+
+    def signed_intents_required(self) -> bool:
+        return os.environ.get("CORTEX_REQUIRE_SIGNED_INTENTS", "0").lower() in {"1", "true", "yes"}
+
+    def intent_ttl_seconds(self) -> int:
+        try:
+            return int(os.environ.get("CORTEX_INTENT_TTL_SECONDS", "300"))
+        except ValueError:
+            return 300
+
+    def _check_signed_intent(self, headers: dict[str, str], session_value: str, capability: str, path: str) -> dict[str, Any]:
+        if not self.signed_intents_required():
+            return {"allowed": True, "reason": "not_required"}
+        timestamp = headers.get("x-cortex-intent-timestamp") or headers.get("X-Cortex-Intent-Timestamp") or ""
+        intent = headers.get("x-cortex-intent") or headers.get("X-Cortex-Intent") or ""
+        signature = headers.get("x-cortex-intent-signature") or headers.get("X-Cortex-Intent-Signature") or ""
+        if not timestamp or not intent or not signature:
+            return {"allowed": False, "reason": "missing_signed_intent"}
+        try:
+            ts = int(timestamp)
+        except ValueError:
+            return {"allowed": False, "reason": "invalid_intent_timestamp"}
+        age = abs(int(time.time()) - ts)
+        if age > self.intent_ttl_seconds():
+            return {"allowed": False, "reason": "expired_signed_intent", "age_seconds": age}
+        import hmac
+        expected = self.sign_intent(session_value, timestamp, path, capability, intent)
+        if not hmac.compare_digest(expected, signature):
+            return {"allowed": False, "reason": "invalid_intent_signature", "age_seconds": age}
+        semantic = self._validate_intent_payload(intent, path, capability)
+        if not semantic["allowed"]:
+            return {**semantic, "age_seconds": age}
+        return {"allowed": True, "reason": "ok", "age_seconds": age, "intent_hash": self._hash(intent), **semantic}
+
+    def _validate_intent_payload(self, intent: str, path: str, capability: str) -> dict[str, Any]:
+        try:
+            data = json.loads(intent)
+        except json.JSONDecodeError:
+            return {"allowed": True, "reason": "opaque_intent"}
+        if not isinstance(data, dict):
+            return {"allowed": False, "reason": "invalid_intent_payload"}
+        if data.get("path") is not None and str(data.get("path")) != path:
+            return {"allowed": False, "reason": "intent_path_mismatch"}
+        if data.get("capability") is not None and str(data.get("capability")) != capability:
+            return {"allowed": False, "reason": "intent_capability_mismatch"}
+        if data.get("method") is not None and str(data.get("method")).upper() != "POST":
+            return {"allowed": False, "reason": "intent_method_mismatch"}
+        return {"allowed": True, "reason": "ok", "intent_fields": sorted(str(k) for k in data.keys())}
 
     def _subject_allowed(self, user: dict[str, Any]) -> bool:
         allowed = self.allowed_subjects()

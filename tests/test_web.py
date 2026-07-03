@@ -193,6 +193,24 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_oauth_intent_endpoint(monkeypatch, tmp_path):
+    monkeypatch.setenv("CORTEX_OIDC_CAPABILITIES", "memory:write")
+    from cortex.oauth import OAuthService
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        session = OAuthService(web.ROOT).create_session({"sub": "user-1"})
+        code, prepared = post_with_headers(
+            base + "/oauth/intent",
+            {"path": "/memory/write", "capability": "memory:write", "intent": {"purpose": "test"}},
+            {"authorization": "Bearer " + session["session_token"]},
+        )
+        assert code == 200
+        assert prepared["status"] == "intent_prepared"
+        assert "x-cortex-intent-signature" in prepared["headers"]
+    finally:
+        server.shutdown()
+
+
 def test_web_oauth_status_and_login(monkeypatch, tmp_path):
     monkeypatch.setenv("CORTEX_OIDC_CLIENT_ID", "client-1")
     monkeypatch.setenv("CORTEX_OIDC_REDIRECT_URI", "https://cortex.example/oauth/callback")

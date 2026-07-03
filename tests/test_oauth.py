@@ -69,11 +69,29 @@ def test_oauth_authorize_is_explicit_and_narrow(tmp_path: Path, monkeypatch):
     assert denied["reason"] == "oauth_capability_not_granted"
 
 
-def test_oauth_authorize_refuses_when_signed_intents_required(tmp_path: Path, monkeypatch):
+def test_oauth_authorize_requires_and_accepts_signed_intent(tmp_path: Path, monkeypatch):
     svc = OAuthService(tmp_path)
     created = svc.create_session({"sub": "user-1"})
     headers = {"authorization": "Bearer " + created["session_token"]}
     monkeypatch.setenv("CORTEX_ENABLE_OAUTH_AUTH", "1")
     monkeypatch.setenv("CORTEX_OIDC_CAPABILITIES", "memory:write")
     monkeypatch.setenv("CORTEX_REQUIRE_SIGNED_INTENTS", "1")
-    assert svc.authorize(headers, "memory:write", "/memory/write")["reason"] == "oauth_signed_intent_not_supported"
+    assert svc.authorize(headers, "memory:write", "/memory/write")["reason"] == "missing_signed_intent"
+    prepared = svc.intent_headers(headers, "/memory/write", "memory:write", {"purpose": "test"})
+    assert prepared["status"] == "intent_prepared"
+    signed_headers = {**headers, **prepared["headers"]}
+    ok = svc.authorize(signed_headers, "memory:write", "/memory/write")
+    assert ok["allowed"] is True
+    assert ok["intent"]["reason"] == "ok"
+
+
+def test_oauth_signed_intent_rejects_wrong_path(tmp_path: Path, monkeypatch):
+    svc = OAuthService(tmp_path)
+    created = svc.create_session({"sub": "user-1"})
+    headers = {"authorization": "Bearer " + created["session_token"]}
+    monkeypatch.setenv("CORTEX_ENABLE_OAUTH_AUTH", "1")
+    monkeypatch.setenv("CORTEX_OIDC_CAPABILITIES", "memory:write")
+    monkeypatch.setenv("CORTEX_REQUIRE_SIGNED_INTENTS", "1")
+    prepared = svc.intent_headers(headers, "/memory/write", "memory:write")
+    signed_headers = {**headers, **prepared["headers"]}
+    assert svc.authorize(signed_headers, "memory:write", "/memory/forget")["reason"] == "invalid_intent_signature"

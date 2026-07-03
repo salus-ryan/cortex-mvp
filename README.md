@@ -110,10 +110,14 @@ curl "$BASE/oauth/login"
 # after provider redirect:
 # curl "$BASE/oauth/callback?code=...&state=..."
 curl "$BASE/oauth/me" -H 'authorization: Bearer oauth_session_value'
+curl -X POST "$BASE/oauth/intent" \
+  -H 'authorization: Bearer oauth_session_value' \
+  -H 'content-type: application/json' \
+  -d '{"path":"/memory/write","capability":"memory:write","intent":{"purpose":"human memory write"}}'
 curl -X POST "$BASE/oauth/logout" -H 'authorization: Bearer oauth_session_value'
 ```
 
-OAuth identifies a human; it does not grant execution authority by itself unless `CORTEX_ENABLE_OAUTH_AUTH=1` is set with narrow `CORTEX_OIDC_CAPABILITIES`. Sessions are local Cortex sessions stored hashed in `runtime/oauth_sessions.json`, with state/PKCE material in `runtime/oauth_states.json` and auth events in `ledger/auth.jsonl`. OAuth-backed protected actions currently refuse when `CORTEX_REQUIRE_SIGNED_INTENTS=1`, pending a separate signed-intent bridge.
+OAuth identifies a human; it does not grant execution authority by itself unless `CORTEX_ENABLE_OAUTH_AUTH=1` is set with narrow `CORTEX_OIDC_CAPABILITIES`. Sessions are local Cortex sessions stored hashed in `runtime/oauth_sessions.json`, with state/PKCE material in `runtime/oauth_states.json` and auth events in `ledger/auth.jsonl`. When `CORTEX_REQUIRE_SIGNED_INTENTS=1`, OAuth sessions can prepare short-lived signed intent headers through `/oauth/intent` and must include those headers on protected POST actions.
 
 Optional hardening:
 
