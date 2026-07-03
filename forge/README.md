@@ -67,10 +67,19 @@ Endpoints:
 
 ```http
 GET  /forge/status
+GET  /forge/apps
+GET  /forge/apps/{app}/status
+GET  /forge/apps/{app}/check
+GET  /forge/apps/{app}/logs
+GET  /forge/apps/{app}/health
 GET  /forge/check
 GET  /forge/job?id=latest
+GET  /forge/jobs/{job_id}
 GET  /forge/logs?lines=200
 GET  /forge/health
+POST /forge/apps/{app}/update
+POST /forge/apps/{app}/deploy
+POST /forge/apps/{app}/rollback
 POST /forge/update
 POST /forge/deploy
 POST /forge/rollback
@@ -79,6 +88,10 @@ POST /forge/rollback
 Mutation endpoints require `Authorization: Bearer $FORGE_TOKEN` when `FORGE_TOKEN` is set.
 
 `/forge/update` is intentionally narrow: it only runs `git pull --ff-only`, with optional expected branch validation.
+
+App-scoped mutation endpoints create jobs and return `202` immediately. Poll them at `/forge/jobs/{job_id}`.
+
+Configure multiple apps with `FORGE_APPS=/etc/cortex/apps.json`; see `forge/apps.example.json`.
 
 Example:
 

@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import subprocess
+import threading
 import urllib.request
 import uuid
 from datetime import datetime, timezone
@@ -19,9 +20,10 @@ from typing import Any
 
 
 class ForgeState:
-    def __init__(self, root: Path, repo: Path) -> None:
+    def __init__(self, root: Path, repo: Path, apps_path: Path | None = None) -> None:
         self.root = root.resolve()
         self.repo = repo.resolve()
+        self.apps_path = apps_path
         self.jobs = self.root / "jobs"
         self.ledger = self.root / "ledger"
         self.logs = self.root / "logs"
@@ -40,11 +42,62 @@ class ForgeState:
         (self.jobs / "latest.json").write_text(json.dumps(job, indent=2, sort_keys=True))
         return job
 
+    def start_job(self, app: str, kind: str, witness: str | None, target, *args: Any) -> dict[str, Any]:
+        job = {
+            "id": "job_" + uuid.uuid4().hex[:12],
+            "app": app,
+            "type": kind,
+            "status": "running",
+            "started_at": self.now(),
+            "finished_at": None,
+            "witness": witness,
+            "may_execute": False,
+        }
+        self.write_job(job)
+
+        def runner() -> None:
+            try:
+                result = target(*args)
+                job.update({"status": result.get("status", "finished"), "finished_at": self.now(), "result": result})
+            except Exception as exc:
+                job.update({"status": "failed", "finished_at": self.now(), "error": str(exc)})
+            self.write_job(job)
+            self.append("jobs.jsonl", {"action_type": "job_finished", **job})
+
+        threading.Thread(target=runner, daemon=True).start()
+        self.append("jobs.jsonl", {"action_type": "job_started", **job})
+        return job
+
     def read_job(self, job_id: str = "latest") -> dict[str, Any]:
         path = self.jobs / ("latest.json" if job_id == "latest" else f"{job_id}.json")
         if not path.exists():
             return {"status": "none", "may_execute": False}
         return json.loads(path.read_text())
+
+    def apps(self) -> dict[str, Any]:
+        if self.apps_path and self.apps_path.exists():
+            data = json.loads(self.apps_path.read_text())
+            return data.get("apps", {})
+        return {
+            "cortex": {
+                "repo": str(self.repo),
+                "container": os.environ.get("CONTAINER_NAME", "cortex"),
+                "image": os.environ.get("IMAGE_NAME", "cortex-mvp:forge"),
+                "host_port": int(os.environ.get("HOST_PORT", "8080")),
+                "port": int(os.environ.get("PORT", "8080")),
+                "public_url": os.environ.get("PUBLIC_URL", "http://127.0.0.1:8080"),
+                "data_root": os.environ.get("DATA_ROOT", "/var/lib/cortex"),
+            }
+        }
+
+    def app(self, name: str) -> dict[str, Any] | None:
+        return self.apps().get(name)
+
+    def for_app(self, name: str) -> "ForgeState":
+        cfg = self.app(name)
+        if not cfg:
+            raise KeyError(f"unknown app: {name}")
+        return ForgeState(self.root / "apps" / name, Path(cfg["repo"]).resolve(), self.apps_path)
 
     def status(self) -> dict[str, Any]:
         return {
@@ -53,6 +106,7 @@ class ForgeState:
             "root": str(self.root),
             "docker_available": self._cmd_available("docker"),
             "git_available": self._cmd_available("git"),
+            "apps": self.apps(),
             "container": self.container_status(),
             "git": self.git_info(),
             "latest": self.read_job(),
@@ -253,13 +307,38 @@ def make_handler(state: ForgeState, token: str | None):
         def do_GET(self) -> None:  # noqa: N802
             if self.path in {"/", "/forge/status"}:
                 self._json(200, state.status())
+            elif self.path == "/forge/apps":
+                self._json(200, {"status": "ok", "apps": state.apps(), "may_execute": False})
+            elif self.path.startswith("/forge/apps/"):
+                parts = self.path.split("?")[0].strip("/").split("/")
+                if len(parts) < 3:
+                    self._json(404, {"status": "not_found"}); return
+                app_name = parts[2]
+                action = parts[3] if len(parts) > 3 else "status"
+                try:
+                    app_state = state.for_app(app_name)
+                except KeyError as exc:
+                    self._json(404, {"status": "not_found", "reason": str(exc)}); return
+                if action == "status":
+                    self._json(200, app_state.status())
+                elif action == "check":
+                    self._json(200, app_state.check())
+                elif action == "logs":
+                    self._json(200, app_state.container_logs())
+                elif action == "health":
+                    self._json(200, app_state.health(app_state.app(app_name).get("public_url") if app_state.app(app_name) else None))
+                else:
+                    self._json(404, {"status": "not_found"})
             elif self.path == "/forge/check":
                 self._json(200, state.check())
-            elif self.path.startswith("/forge/job"):
-                _, _, query = self.path.partition("?")
-                job_id = "latest"
-                if query.startswith("id="):
-                    job_id = query.removeprefix("id=")
+            elif self.path.startswith("/forge/job") or self.path.startswith("/forge/jobs/"):
+                if self.path.startswith("/forge/jobs/"):
+                    job_id = self.path.rsplit("/", 1)[-1]
+                else:
+                    _, _, query = self.path.partition("?")
+                    job_id = "latest"
+                    if query.startswith("id="):
+                        job_id = query.removeprefix("id=")
                 self._json(200, state.read_job(job_id))
             elif self.path.startswith("/forge/logs"):
                 _, _, query = self.path.partition("?")
@@ -284,7 +363,32 @@ def make_handler(state: ForgeState, token: str | None):
             except json.JSONDecodeError as exc:
                 self._json(400, {"status": "bad_json", "error": str(exc)})
                 return
-            if self.path == "/forge/deploy":
+            if self.path.startswith("/forge/apps/"):
+                parts = self.path.strip("/").split("/")
+                if len(parts) < 4:
+                    self._json(404, {"status": "not_found"}); return
+                app_name, action = parts[2], parts[3]
+                try:
+                    app_state = state.for_app(app_name)
+                except KeyError as exc:
+                    self._json(404, {"status": "not_found", "reason": str(exc)}); return
+                cfg = state.app(app_name) or {}
+                if action == "deploy":
+                    if body.get("async", True):
+                        job = state.start_job(app_name, "deploy", body.get("witness"), app_state.deploy, body.get("witness"), bool(body.get("confirmed", False)), body.get("public_url", cfg.get("public_url")))
+                        self._json(202, job)
+                    else:
+                        result = app_state.deploy(body.get("witness"), bool(body.get("confirmed", False)), body.get("public_url", cfg.get("public_url")))
+                        self._json(200 if result["status"] == "deployed" else 403, result)
+                elif action == "update":
+                    job = state.start_job(app_name, "update", body.get("witness"), app_state.update_repo, body.get("witness"), bool(body.get("confirmed", False)), body.get("expected_branch"))
+                    self._json(202, job)
+                elif action == "rollback":
+                    job = state.start_job(app_name, "rollback", body.get("witness"), app_state.rollback, body.get("witness"), bool(body.get("confirmed", False)))
+                    self._json(202, job)
+                else:
+                    self._json(404, {"status": "not_found"})
+            elif self.path == "/forge/deploy":
                 result = state.deploy(body.get("witness"), bool(body.get("confirmed", False)), body.get("public_url"))
                 self._json(200 if result["status"] == "deployed" else 403, result)
             elif self.path == "/forge/rollback":
@@ -306,10 +410,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=os.environ.get("FORGE_ROOT", "/var/lib/cortex-forge"))
     parser.add_argument("--repo", default=os.environ.get("FORGE_REPO", os.getcwd()))
+    parser.add_argument("--apps", default=os.environ.get("FORGE_APPS"))
     parser.add_argument("--host", default=os.environ.get("FORGE_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("FORGE_PORT", "8765")))
     args = parser.parse_args(argv)
-    state = ForgeState(Path(args.root), Path(args.repo))
+    state = ForgeState(Path(args.root), Path(args.repo), Path(args.apps) if args.apps else None)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, os.environ.get("FORGE_TOKEN")))
     print(f"cortex forge serving on {args.host}:{args.port}", flush=True)
     server.serve_forever()

@@ -1,0 +1,13 @@
+{
+  "apps": {
+    "cortex": {
+      "repo": "/opt/cortex-mvp",
+      "container": "cortex",
+      "image": "cortex-mvp:forge",
+      "host_port": 8080,
+      "port": 8080,
+      "public_url": "https://cortex.example.com",
+      "data_root": "/var/lib/cortex"
+    }
+  }
+}

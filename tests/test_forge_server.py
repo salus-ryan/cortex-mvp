@@ -28,6 +28,32 @@ def test_forge_state_refuses_without_witness(tmp_path):
     assert state.deploy("alice", False)["status"] == "refused"
 
 
+def test_forge_apps_registry(tmp_path):
+    repo = make_repo(tmp_path)
+    apps = tmp_path / "apps.json"
+    apps.write_text(json.dumps({"apps": {"cortex": {"repo": str(repo), "container": "cortex", "public_url": "http://127.0.0.1:8080"}}}))
+    state = ForgeState(tmp_path / "state", repo, apps)
+    assert "cortex" in state.apps()
+    assert state.for_app("cortex").repo == repo
+
+
+def test_forge_job_model(tmp_path):
+    state = ForgeState(tmp_path / "state", make_repo(tmp_path))
+    def done():
+        import time
+        time.sleep(0.1)
+        return {"status": "ok", "may_execute": False}
+    job = state.start_job("cortex", "noop", "alice", done)
+    assert job["status"] in {"running", "ok"}
+    import time
+    for _ in range(20):
+        latest = state.read_job(job["id"])
+        if latest["status"] == "ok":
+            break
+        time.sleep(0.05)
+    assert state.read_job(job["id"])["status"] == "ok"
+
+
 def test_forge_state_check_reports_blockers(tmp_path, monkeypatch):
     state = ForgeState(tmp_path / "state", make_repo(tmp_path))
     monkeypatch.setattr(state, "_cmd_available", lambda cmd: False if cmd == "docker" else True)
