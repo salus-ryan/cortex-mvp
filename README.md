@@ -294,6 +294,7 @@ cortex/
 canon/                   # Canonical grammar and roles
 evals/                   # Law, drift, refusal, and identity tests
 forge/                   # Minimal self-owned PaaS scripts, bootstrapper, and systemd unit
+image/portable-linux/    # Portable USB layout; first step toward bootable Cortex thumb drive
 cortex_forge/            # Forge HTTP control plane and execution providers
 ledger/                  # Append-only JSONL witness streams
 runtime/                 # Permissions and runtime state
@@ -331,6 +332,7 @@ python -m pytest \
   tests/test_patch_service.py \
   tests/test_payments.py \
   tests/test_pid1.py \
+  tests/test_portable_linux.py \
   tests/test_prophet.py \
   tests/test_repo_service.py \
   tests/test_self_train.py \
