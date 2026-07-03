@@ -192,6 +192,16 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/relationship/remember":
             result = RelationshipService(ROOT).remember(str(payload.get("content", "")), payload.get("witness"), str(payload.get("source", "mobile_chat")))
             self._json(200 if result["status"] == "remembered" else 400, result)
+        elif self.path == "/relationship/converse":
+            text = str(payload.get("content", "")).strip()
+            witness = payload.get("witness")
+            rel = RelationshipService(ROOT)
+            remembered = rel.remember(text, witness, str(payload.get("source", "mobile_converse"))) if text else {"status": "refused", "reason": "content is required", "may_execute": False}
+            profile = rel.profile()
+            task = "Respond conversationally and briefly to the human. Use the relationship profile as context. Human said: " + text
+            oracle = OracleClient(ROOT).propose(task, "interpret", {"mobile": True, "relationship_profile": profile.get("summary"), "remembered": remembered.get("status")})
+            result = {"status": "conversed", "remembered": remembered, "profile": profile, "oracle": oracle, "reply": oracle.get("proposal"), "may_execute": False}
+            self._json(200 if remembered.get("status") == "remembered" else 400, result)
         elif self.path == "/witness":
             rec = WitnessService(ROOT).witness(str(payload.get("witness", payload.get("name", "human"))), str(payload.get("statement", "")), str(payload.get("scope", "general")), payload.get("signature"))
             self._json(200, {"status": "witnessed", "record": rec})

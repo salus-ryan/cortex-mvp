@@ -60,6 +60,7 @@ class MobileE2E:
         return {
             "/memory/write": "memory:write",
             "/relationship/remember": "memory:write",
+            "/relationship/converse": "memory:write",
             "/tool/execute": "tool:execute",
             "/patch/apply": "patch:apply",
             "/build/apply": "build:apply",

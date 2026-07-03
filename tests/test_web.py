@@ -170,6 +170,8 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         assert code == 200 and data["status"] == "reflected"
         code, data = post(base + "/payments/intent", {"amount_cents": 500, "purpose": "VPS fund", "currency": "usd"})
         assert code == 200 and data["status"] == "intent_prepared"
+        code, data = get(base + "/relationship/profile")
+        assert code == 200 and data["status"] == "ok"
         req = urllib.request.Request(base + "/deploy/forge", data=json.dumps({"confirmed": True}).encode(), headers={"content-type": "application/json"}, method="POST")
         try:
             urllib.request.urlopen(req, timeout=5)
