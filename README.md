@@ -68,6 +68,24 @@ python -m cortex.init shutdown --reason "operator request"
 python -m cortex.web                  # web service alone, without PID-1 supervision
 ```
 
+## Start local dashboard
+
+```bash
+scripts/open_cortex.sh
+```
+
+This starts Forge locally and opens:
+
+```text
+http://127.0.0.1:8765/ui
+```
+
+Optional Docker-backed Cortex container:
+
+```bash
+START_CORTEX=1 scripts/open_cortex.sh
+```
+
 ## HTTP API
 
 The deployed service exposes a minimal lawful invocation surface:
@@ -331,6 +349,7 @@ python -m pytest \
   tests/test_init.py \
   tests/test_local_mind.py \
   tests/test_missing_pieces.py \
+  tests/test_open_cortex_script.py \
   tests/test_oracle.py \
   tests/test_patch_service.py \
   tests/test_payments.py \
