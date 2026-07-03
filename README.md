@@ -89,6 +89,30 @@ Protected capabilities include deploy, patch/build apply, memory write, relation
 
 The mobile `Know` tab lets the human talk with Cortex through one `Send` action. Cortex replies and learns the message as witnessed `personal` memory when auth is saved; those memories are surfaced through `/relationship/profile`. The same tab can export visible memory and forget selected memory IDs through witnessed tombstones.
 
+Generic OIDC/PKCE login bootstrap:
+
+```text
+CORTEX_OIDC_CLIENT_ID=...
+CORTEX_OIDC_REDIRECT_URI=https://your-host/oauth/callback
+CORTEX_OIDC_ISSUER=https://issuer.example
+# or set CORTEX_OIDC_AUTHORIZATION_ENDPOINT directly
+CORTEX_OIDC_ALLOWED_SUBJECTS=sub-or-email-or-username,another-subject
+CORTEX_OIDC_SESSION_TTL_SECONDS=28800
+```
+
+Current OIDC surface starts the provider login with PKCE and records state:
+
+```bash
+curl "$BASE/oauth/status"
+curl "$BASE/oauth/login"
+# after provider redirect:
+# curl "$BASE/oauth/callback?code=...&state=..."
+curl "$BASE/oauth/me" -H 'authorization: Bearer oauth_session_value'
+curl -X POST "$BASE/oauth/logout" -H 'authorization: Bearer oauth_session_value'
+```
+
+OAuth identifies a human; it does not grant execution authority by itself. Sessions are local Cortex sessions stored hashed in `runtime/oauth_sessions.json`, with state/PKCE material in `runtime/oauth_states.json` and auth events in `ledger/auth.jsonl`.
+
 Optional hardening:
 
 ```text
@@ -193,6 +217,8 @@ curl "$BASE/deploy/status"
 curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
 curl "$BASE/payments/status"
 curl "$BASE/auth/status"
+curl "$BASE/oauth/status"
+curl "$BASE/oauth/login"
 curl "$BASE/foundry/plan"
 curl "$BASE/state/manifest"
 curl "$BASE/awareness"

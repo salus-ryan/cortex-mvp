@@ -183,6 +183,23 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_oauth_status_and_login(monkeypatch, tmp_path):
+    monkeypatch.setenv("CORTEX_OIDC_CLIENT_ID", "client-1")
+    monkeypatch.setenv("CORTEX_OIDC_REDIRECT_URI", "https://cortex.example/oauth/callback")
+    monkeypatch.setenv("CORTEX_OIDC_AUTHORIZATION_ENDPOINT", "https://issuer.example/authorize")
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        code, status = get(base + "/oauth/status")
+        assert code == 200
+        assert status["configured"] is True
+        code, login = get(base + "/oauth/login")
+        assert code == 200
+        assert login["status"] == "login_url"
+        assert "code_challenge" in login["authorization_url"]
+    finally:
+        server.shutdown()
+
+
 def test_web_model_next_step(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:

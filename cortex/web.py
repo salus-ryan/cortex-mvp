@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from cortex.immune import ImmuneService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
+from cortex.oauth import OAuthService
 from cortex.patch_service import PatchService
 from cortex.payments import PaymentService
 from cortex.planner import PlannerService
@@ -93,13 +95,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib API
         init = CortexInit(ROOT)
-        if self.path in ("/mobile", "/mobile/"):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+        if path in ("/mobile", "/mobile/"):
             self._static_mobile("index.html")
-        elif self.path == "/mobile/manifest.json":
+        elif path == "/mobile/manifest.json":
             self._static_mobile("manifest.json", "application/manifest+json")
-        elif self.path == "/mobile/service-worker.js":
+        elif path == "/mobile/service-worker.js":
             self._static_mobile("service-worker.js", "application/javascript")
-        elif self.path in ("/", "/health"):
+        elif path in ("/", "/health"):
             self._json(200, {"status": "ok", "service": "cortex", "anti_idolatry": ANTI_IDOLATRY})
         elif self.path == "/status":
             self._json(200, init.status())
@@ -148,10 +153,23 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, StateService(ROOT).manifest())
         elif self.path == "/state/export":
             self._json(200, StateService(ROOT).export())
-        elif self.path == "/auth/status":
+        elif path == "/auth/status":
             self._json(200, AuthService(ROOT).status())
-        elif self.path == "/auth/me":
+        elif path == "/auth/me":
             self._json(200, AuthService(ROOT).me(dict(self.headers)))
+        elif path == "/oauth/status":
+            self._json(200, OAuthService(ROOT).status())
+        elif path == "/oauth/login":
+            result = OAuthService(ROOT).login()
+            self._json(200 if result["status"] == "login_url" else 400, result)
+        elif path == "/oauth/callback":
+            result = OAuthService(ROOT).callback(
+                code=(query.get("code") or [""])[0],
+                state=(query.get("state") or [""])[0],
+            )
+            self._json(200 if result["status"] == "authenticated" else 403, result)
+        elif path == "/oauth/me":
+            self._json(200, OAuthService(ROOT).me(dict(self.headers)))
         elif self.path == "/relationship/profile":
             self._json(200, RelationshipService(ROOT).profile())
         elif self.path == "/awareness":
@@ -233,6 +251,8 @@ class Handler(BaseHTTPRequestHandler):
                 payload=dict(payload.get("payload", {}) or {}),
             )
             self._json(200 if rec["status"] == "ready_for_human_confirmation" else 403, rec)
+        elif self.path == "/oauth/logout":
+            self._json(200, OAuthService(ROOT).logout(dict(self.headers)))
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)
