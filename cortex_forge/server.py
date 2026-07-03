@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import subprocess
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -52,9 +53,57 @@ class ForgeState:
             "root": str(self.root),
             "docker_available": self._cmd_available("docker"),
             "git_available": self._cmd_available("git"),
+            "container": self.container_status(),
+            "git": self.git_info(),
             "latest": self.read_job(),
             "may_execute": False,
         }
+
+    def git_info(self) -> dict[str, Any]:
+        head = self._run(["git", "rev-parse", "HEAD"], timeout=10)
+        branch = self._run(["git", "rev-parse", "--abbrev-ref", "HEAD"], timeout=10)
+        status = self._run(["git", "status", "--short", "--branch"], timeout=20)
+        return {
+            "head": head["stdout"].strip(),
+            "branch": branch["stdout"].strip(),
+            "status": status,
+            "dirty": any(line and not line.startswith("##") for line in status["stdout"].splitlines()) if status["returncode"] == 0 else None,
+        }
+
+    def container_status(self, name: str | None = None) -> dict[str, Any]:
+        name = name or os.environ.get("CONTAINER_NAME", "cortex")
+        if not self._cmd_available("docker"):
+            return {"available": False, "reason": "docker unavailable"}
+        inspect = self._run(["docker", "inspect", name], timeout=20)
+        if inspect["returncode"] != 0:
+            return {"available": False, "name": name, "reason": inspect["stderr"] or inspect["stdout"]}
+        try:
+            data = json.loads(inspect["stdout"])[0]
+        except Exception as exc:
+            return {"available": False, "name": name, "reason": str(exc)}
+        state = data.get("State", {})
+        return {"available": True, "name": name, "running": bool(state.get("Running")), "status": state.get("Status"), "image": data.get("Config", {}).get("Image")}
+
+    def container_logs(self, lines: int = 200, name: str | None = None) -> dict[str, Any]:
+        name = name or os.environ.get("CONTAINER_NAME", "cortex")
+        if not self._cmd_available("docker"):
+            return {"status": "unavailable", "reason": "docker unavailable", "may_execute": False}
+        lines = max(1, min(lines, 1000))
+        proc = self._run(["docker", "logs", "--tail", str(lines), name], timeout=30)
+        return {"status": "ok" if proc["returncode"] == 0 else "fail", "container": name, "stdout": proc["stdout"], "stderr": proc["stderr"], "may_execute": False}
+
+    def health(self, public_url: str | None = None) -> dict[str, Any]:
+        public_url = (public_url or os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8080").rstrip("/")
+        checks: list[dict[str, Any]] = []
+        for path in ["/health", "/pid1"]:
+            try:
+                with urllib.request.urlopen(public_url + path, timeout=15) as resp:
+                    data = json.loads(resp.read().decode())
+                checks.append({"path": path, "status": "pass", "code": resp.status, "data": data})
+            except Exception as exc:
+                checks.append({"path": path, "status": "fail", "error": str(exc)})
+        ok = all(c["status"] == "pass" for c in checks)
+        return {"status": "pass" if ok else "fail", "public_url": public_url, "checks": checks, "may_execute": False}
 
     def check(self) -> dict[str, Any]:
         blockers: list[str] = []
@@ -110,6 +159,32 @@ class ForgeState:
         }
         self.write_job(job)
         self.append("forge.jsonl", {"action_type": "deploy", **job})
+        return job
+
+    def update_repo(self, witness: str | None, confirmed: bool, expected_branch: str | None = None) -> dict[str, Any]:
+        if not witness:
+            return self._refuse("repo update requires witness")
+        if not confirmed:
+            return self._refuse("repo update requires confirmed=true")
+        if expected_branch:
+            branch = self._run(["git", "rev-parse", "--abbrev-ref", "HEAD"], timeout=10)["stdout"].strip()
+            if branch != expected_branch:
+                return self._refuse("branch mismatch", {"expected": expected_branch, "actual": branch})
+        proc = subprocess.run(["git", "pull", "--ff-only"], cwd=self.repo, text=True, capture_output=True, timeout=120)
+        job = {
+            "id": "update_" + uuid.uuid4().hex[:12],
+            "status": "updated" if proc.returncode == 0 else "failed",
+            "timestamp": self.now(),
+            "command": ["git", "pull", "--ff-only"],
+            "returncode": proc.returncode,
+            "stdout": proc.stdout[-12000:],
+            "stderr": proc.stderr[-12000:],
+            "witness": witness,
+            "confirmed": confirmed,
+            "may_execute": False,
+        }
+        self.write_job(job)
+        self.append("forge.jsonl", {"action_type": "update_repo", **job})
         return job
 
     def rollback(self, witness: str | None, confirmed: bool) -> dict[str, Any]:
@@ -186,6 +261,17 @@ def make_handler(state: ForgeState, token: str | None):
                 if query.startswith("id="):
                     job_id = query.removeprefix("id=")
                 self._json(200, state.read_job(job_id))
+            elif self.path.startswith("/forge/logs"):
+                _, _, query = self.path.partition("?")
+                lines = 200
+                if query.startswith("lines="):
+                    try:
+                        lines = int(query.removeprefix("lines="))
+                    except ValueError:
+                        lines = 200
+                self._json(200, state.container_logs(lines))
+            elif self.path.startswith("/forge/health"):
+                self._json(200, state.health())
             else:
                 self._json(404, {"status": "not_found"})
 
@@ -204,6 +290,9 @@ def make_handler(state: ForgeState, token: str | None):
             elif self.path == "/forge/rollback":
                 result = state.rollback(body.get("witness"), bool(body.get("confirmed", False)))
                 self._json(200 if result["status"] == "rolled_back" else 403, result)
+            elif self.path == "/forge/update":
+                result = state.update_repo(body.get("witness"), bool(body.get("confirmed", False)), body.get("expected_branch"))
+                self._json(200 if result["status"] == "updated" else 403, result)
             else:
                 self._json(404, {"status": "not_found"})
 

@@ -36,6 +36,33 @@ def test_forge_state_check_reports_blockers(tmp_path, monkeypatch):
     assert "docker unavailable" in report["blockers"]
 
 
+def test_forge_status_contains_git_and_container(tmp_path, monkeypatch):
+    state = ForgeState(tmp_path / "state", make_repo(tmp_path))
+    monkeypatch.setattr(state, "_cmd_available", lambda cmd: False if cmd == "docker" else True)
+    status = state.status()
+    assert status["git"]["head"]
+    assert status["container"]["available"] is False
+
+
+def test_forge_update_requires_witness(tmp_path):
+    state = ForgeState(tmp_path / "state", make_repo(tmp_path))
+    assert state.update_repo(None, True)["status"] == "refused"
+    assert state.update_repo("alice", False)["status"] == "refused"
+
+
+def test_forge_update_branch_mismatch(tmp_path):
+    state = ForgeState(tmp_path / "state", make_repo(tmp_path))
+    result = state.update_repo("alice", True, expected_branch="not-current")
+    assert result["status"] == "refused"
+    assert "branch mismatch" in result["reason"]
+
+
+def test_forge_logs_without_docker(tmp_path, monkeypatch):
+    state = ForgeState(tmp_path / "state", make_repo(tmp_path))
+    monkeypatch.setattr(state, "_cmd_available", lambda cmd: False)
+    assert state.container_logs()["status"] == "unavailable"
+
+
 def test_forge_state_deploy_allowlisted_script(tmp_path, monkeypatch):
     state = ForgeState(tmp_path / "state", make_repo(tmp_path))
     monkeypatch.setattr(state, "_cmd_available", lambda cmd: True)

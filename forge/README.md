@@ -69,11 +69,16 @@ Endpoints:
 GET  /forge/status
 GET  /forge/check
 GET  /forge/job?id=latest
+GET  /forge/logs?lines=200
+GET  /forge/health
+POST /forge/update
 POST /forge/deploy
 POST /forge/rollback
 ```
 
 Mutation endpoints require `Authorization: Bearer $FORGE_TOKEN` when `FORGE_TOKEN` is set.
+
+`/forge/update` is intentionally narrow: it only runs `git pull --ff-only`, with optional expected branch validation.
 
 Example:
 
