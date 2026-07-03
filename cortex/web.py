@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from cortex.auth import AuthService
 from cortex.awareness import AwarenessService
 from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
@@ -70,7 +71,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib API
         init = CortexInit(ROOT)
-        if self.path in ("/", "/health"):
+        if self.path in ("/mobile", "/mobile/"):
+            self._static_mobile("index.html")
+        elif self.path == "/mobile/manifest.json":
+            self._static_mobile("manifest.json", "application/manifest+json")
+        elif self.path == "/mobile/service-worker.js":
+            self._static_mobile("service-worker.js", "application/javascript")
+        elif self.path in ("/", "/health"):
             self._json(200, {"status": "ok", "service": "cortex", "anti_idolatry": ANTI_IDOLATRY})
         elif self.path == "/status":
             self._json(200, init.status())
@@ -109,6 +116,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeployService(ROOT).report())
         elif self.path == "/payments/status":
             self._json(200, PaymentService(ROOT).status())
+        elif self.path == "/auth/status":
+            self._json(200, AuthService(ROOT).status())
+        elif self.path == "/auth/me":
+            self._json(200, AuthService(ROOT).me(dict(self.headers)))
         elif self.path == "/awareness":
             self._json(200, AwarenessService(ROOT).state())
         elif self.path == "/awareness/latest":
@@ -122,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -134,6 +145,11 @@ class Handler(BaseHTTPRequestHandler):
             payload = self._read_json_body()
         except json.JSONDecodeError as exc:
             self._json(400, {"status": "bad_json", "error": str(exc)})
+            return
+
+        auth_refusal = AuthService(ROOT).protect(dict(self.headers), self.path)
+        if auth_refusal:
+            self._json(401, auth_refusal)
             return
 
         pipeline = InvocationPipeline(ROOT)
@@ -226,6 +242,18 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AwarenessService(ROOT).reflect(str(payload.get("prompt", ""))))
         else:
             self._json(404, {"status": "not_found"})
+
+    def _static_mobile(self, name: str, content_type: str = "text/html") -> None:
+        path = ROOT / "mobile" / name
+        if not path.exists():
+            self._json(404, {"status": "not_found"})
+            return
+        body = path.read_bytes()
+        self.send_response(200)
+        self.send_header("content-type", content_type)
+        self.send_header("content-length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _openai_chat(self, payload: dict[str, Any], scribe: ScribeClient) -> None:
         messages = list(payload.get("messages", []) or [])

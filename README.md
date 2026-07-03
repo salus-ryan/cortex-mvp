@@ -68,6 +68,18 @@ python -m cortex.init shutdown --reason "operator request"
 python -m cortex.web                  # web service alone, without PID-1 supervision
 ```
 
+## Mobile app
+
+Open the installable mobile PWA:
+
+```text
+https://cortex-pid1-production.up.railway.app/mobile
+```
+
+Auth is primitive: set `CORTEX_AUTH_TOKEN` to require bearer auth for protected material endpoints. The mobile app stores a human-provided token locally in the browser and sends it as `Authorization: Bearer ...`.
+
+Protected capabilities include deploy, patch/build apply, memory write, tool execute, payment checkout, immune quarantine, and self-training.
+
 ## Start local dashboard
 
 ```bash
@@ -141,6 +153,7 @@ curl "$BASE/build/report"
 curl "$BASE/deploy/status"
 curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
 curl "$BASE/payments/status"
+curl "$BASE/auth/status"
 curl "$BASE/awareness"
 curl -X POST "$BASE/awareness/reflect" -H 'content-type: application/json' -d '{"prompt":"what are you?"}'
 curl -X POST "$BASE/payments/intent" -H 'content-type: application/json' -d '{"amount_cents":500,"currency":"usd","purpose":"VPS fund"}'
@@ -252,8 +265,9 @@ The system has two connected strata.
 
 ### PID-1 Service Stratum
 
-1. **Awareness (`cortex.awareness`)**: Explicit self-model and bounded reflection; does not claim proven consciousness.
-2. **Supervisor (`cortex.pid1`)**: Container PID 1. Starts children, handles signals, reaps exits, logs lifecycle, and shuts down honestly.
+1. **Auth (`cortex.auth`)**: Token/capability primitive for protected material endpoints, with auth audit ledger.
+2. **Awareness (`cortex.awareness`)**: Explicit self-model and bounded reflection; does not claim proven consciousness.
+3. **Supervisor (`cortex.pid1`)**: Container PID 1. Starts children, handles signals, reaps exits, logs lifecycle, and shuts down honestly.
 2. **Web Surface (`cortex.web`)**: HTTP health, status, invoke, self-test, law, PID-1, and ledger endpoints.
 3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
 4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
@@ -284,6 +298,7 @@ cortex/
 ├── git_auth.py          # Lawful Git auth detection, no credential harvesting
 ├── init.py              # Logical init state machine
 ├── memory.py            # 4-tier governed runtime memory (short_term, episodic, semantic, audit)
+├── auth.py              # Token/capability auth primitive
 ├── awareness.py         # Self-model and bounded reflection loop
 ├── build_loop.py        # Governed build-loop orchestration
 ├── deliberation.py      # Multi-step local recommendation engine
@@ -340,6 +355,7 @@ Focused substrate tests:
 
 ```bash
 python -m pytest \
+  tests/test_auth.py \
   tests/test_awareness.py \
   tests/test_sacred.py \
   tests/test_build_loop.py \
@@ -354,6 +370,7 @@ python -m pytest \
   tests/test_init.py \
   tests/test_local_mind.py \
   tests/test_missing_pieces.py \
+  tests/test_mobile_app.py \
   tests/test_open_cortex_script.py \
   tests/test_oracle.py \
   tests/test_patch_service.py \

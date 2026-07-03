@@ -1,0 +1,17 @@
+{
+  "name": "Cortex",
+  "short_name": "Cortex",
+  "start_url": "/mobile",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090d12",
+  "theme_color": "#121923",
+  "description": "Mobile witness console for Cortex",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%23121923'/%3E%3Ccircle cx='64' cy='64' r='36' fill='none' stroke='%233ddc97' stroke-width='10'/%3E%3Ccircle cx='64' cy='64' r='8' fill='%23e6edf3'/%3E%3C/svg%3E",
+      "sizes": "128x128",
+      "type": "image/svg+xml"
+    }
+  ]
+}

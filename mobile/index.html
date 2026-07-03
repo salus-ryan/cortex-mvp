@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <link rel="manifest" href="/mobile/manifest.json" />
+  <title>Cortex Mobile</title>
+  <style>
+    :root{color-scheme:dark;--bg:#090d12;--card:#121923;--line:#263241;--fg:#e6edf3;--muted:#8fa3b8;--ok:#3ddc97;--bad:#ef476f}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,sans-serif} main{max-width:680px;margin:0 auto;padding:18px 14px 90px}
+    header{position:sticky;top:0;background:linear-gradient(var(--bg),#090d12dd);padding:14px 0;backdrop-filter:blur(8px);z-index:2} h1{margin:0;font-size:23px} h2{margin:0 0 10px;font-size:17px}.muted{color:var(--muted);font-size:13px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;margin:12px 0}.row{display:flex;gap:8px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{border:1px solid var(--line);border-radius:14px;padding:12px;background:#0d141d}.label{color:var(--muted);font-size:12px}.value{font-size:18px;margin-top:3px}.ok{color:var(--ok)}.bad{color:var(--bad)}
+    input,textarea{width:100%;background:#081018;color:var(--fg);border:1px solid #3a4b60;border-radius:12px;padding:12px;margin:7px 0;font:inherit} textarea{min-height:92px} button{flex:1;border:1px solid #3a4b60;background:#203044;color:var(--fg);border-radius:14px;padding:13px 12px;font-weight:700}.primary{background:#1d4f3d;border-color:#35775d}.danger{background:#351724;border-color:#6b2840} pre{white-space:pre-wrap;word-break:break-word;background:#081018;border:1px solid var(--line);border-radius:12px;padding:12px;max-height:330px;overflow:auto;font-size:13px}
+    nav{position:fixed;left:0;right:0;bottom:0;background:#0b1119ee;border-top:1px solid var(--line);display:flex;gap:6px;padding:8px max(8px,env(safe-area-inset-left)) max(8px,env(safe-area-inset-bottom));backdrop-filter:blur(10px)} nav button{font-size:13px;padding:10px 6px}.hide{display:none}
+  </style>
+</head>
+<body>
+<main>
+  <header><h1>Cortex</h1><div class="muted">mobile witness console</div></header>
+
+  <section id="home" class="view">
+    <div class="card"><h2>Now</h2><div class="grid"><div class="stat"><div class="label">PID 1</div><div id="pid" class="value">—</div></div><div class="stat"><div class="label">Auth</div><div id="auth" class="value">—</div></div><div class="stat"><div class="label">Awareness</div><div id="aware" class="value">—</div></div><div class="stat"><div class="label">Children</div><div id="children" class="value">—</div></div></div><div class="row" style="margin-top:10px"><button onclick="refresh()">Refresh</button><button onclick="reflect()" class="primary">Reflect</button></div></div>
+    <div class="card"><h2>Output</h2><pre id="out">Ready.</pre></div>
+  </section>
+
+  <section id="chat" class="view hide">
+    <div class="card"><h2>Ask Cortex</h2><textarea id="prompt" placeholder="Ask for an explanation or bounded proposal"></textarea><button class="primary" onclick="ask()">Ask</button><pre id="chatout">Oracle output appears here.</pre></div>
+  </section>
+
+  <section id="actions" class="view hide">
+    <div class="card"><h2>Witness Action</h2><input id="witness" placeholder="witness name"/><label class="muted"><input id="confirmed" type="checkbox"/> confirmed</label><div class="row"><button onclick="deployCheck()">Deploy Check</button><button class="danger" onclick="quarantine()">Quarantine</button></div><pre id="actout">Protected actions require auth when configured.</pre></div>
+  </section>
+
+  <section id="settings" class="view hide">
+    <div class="card"><h2>Auth Primitive</h2><div class="muted">Paste a human-provided Cortex token. Stored locally in this browser only.</div><input id="token" type="password" placeholder="Bearer token"/><input id="actor" placeholder="actor name"/><div class="row"><button onclick="saveAuth()" class="primary">Save</button><button onclick="clearAuth()">Clear</button></div><pre id="settingsout">No secret is sent except as Authorization when calling Cortex.</pre></div>
+  </section>
+</main>
+<nav><button onclick="show('home')">Home</button><button onclick="show('chat')">Chat</button><button onclick="show('actions')">Actions</button><button onclick="show('settings')">Auth</button></nav>
+<script>
+const $=id=>document.getElementById(id); const pretty=x=>JSON.stringify(x,null,2);
+function headers(){const h={'content-type':'application/json'}; const t=localStorage.cortexToken; if(t)h.authorization='Bearer '+t; if(localStorage.cortexActor)h['x-cortex-actor']=localStorage.cortexActor; return h}
+async function api(path,opts={}){const r=await fetch(path,{...opts,headers:{...headers(),...(opts.headers||{})}}); const txt=await r.text(); let d; try{d=JSON.parse(txt)}catch{d={raw:txt}} if(!r.ok)d._http_status=r.status; return d}
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.add('hide')); $(id).classList.remove('hide')}
+function set(id,v,ok){$(id).textContent=v; $(id).className='value '+(ok?'ok':'bad')}
+async function refresh(){const [p,a,m]=await Promise.all([api('/pid1'),api('/auth/status'),api('/awareness')]); set('pid',String(!!p.is_pid1),!!p.is_pid1); set('auth',a.configured?'on':'dev',true); set('aware',m.status||'?',m.status==='aware'); $('children').textContent=Object.keys(p.children||{}).length; $('out').textContent=pretty({pid1:p,auth:a,awareness:m})}
+async function reflect(){const d=await api('/awareness/reflect',{method:'POST',body:JSON.stringify({prompt:'Give me a mobile-sized self report.'})}); $('out').textContent=d.reflection||pretty(d)}
+async function ask(){const d=await api('/oracle',{method:'POST',body:JSON.stringify({task:$('prompt').value,authority:'interpret',context:{mobile:true}})}); $('chatout').textContent=d.proposal||pretty(d)}
+async function deployCheck(){const d=await api('/deploy/check',{method:'POST',body:JSON.stringify({witness:$('witness').value,confirmed:$('confirmed').checked})}); $('actout').textContent=pretty(d)}
+async function quarantine(){const d=await api('/immune/quarantine',{method:'POST',body:JSON.stringify({witness:$('witness').value,reason:'mobile witness quarantine',source:'mobile',confirmed:$('confirmed').checked})}); $('actout').textContent=pretty(d)}
+function saveAuth(){localStorage.cortexToken=$('token').value; localStorage.cortexActor=$('actor').value; $('settingsout').textContent='saved locally'; refresh()} function clearAuth(){delete localStorage.cortexToken; delete localStorage.cortexActor; $('settingsout').textContent='cleared'; refresh()}
+$('token').value=localStorage.cortexToken||''; $('actor').value=localStorage.cortexActor||''; if('serviceWorker' in navigator) navigator.serviceWorker.register('/mobile/service-worker.js').catch(()=>{}); refresh();
+</script>
+</body>
+</html>
