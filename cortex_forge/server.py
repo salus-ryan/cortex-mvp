@@ -19,6 +19,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from cortex_forge.providers.github_actions import GitHubActionsProvider
+
 
 class ForgeState:
     def __init__(self, root: Path, repo: Path, apps_path: Path | None = None) -> None:
@@ -375,6 +377,8 @@ def make_handler(state: ForgeState, token: str | None):
                 self._json(200, state.container_logs(lines))
             elif self.path.startswith("/forge/health"):
                 self._json(200, state.health())
+            elif self.path == "/forge/actions/runs":
+                self._json(200, GitHubActionsProvider.from_env().latest_runs())
             else:
                 self._json(404, {"status": "not_found"})
 
@@ -421,6 +425,9 @@ def make_handler(state: ForgeState, token: str | None):
             elif self.path == "/forge/update":
                 result = state.update_repo(body.get("witness"), bool(body.get("confirmed", False)), body.get("expected_branch"))
                 self._json(200 if result["status"] == "updated" else 403, result)
+            elif self.path == "/forge/actions/dispatch":
+                result = GitHubActionsProvider.from_env().dispatch(str(body.get("action", "test")), body.get("witness"), bool(body.get("confirmed", False)), str(body.get("ref", "master")), dict(body.get("extra", {}) or {}))
+                self._json(202 if result["status"] == "dispatched" else 403, result)
             else:
                 self._json(404, {"status": "not_found"})
 

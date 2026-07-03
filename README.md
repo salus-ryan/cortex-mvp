@@ -294,7 +294,7 @@ cortex/
 canon/                   # Canonical grammar and roles
 evals/                   # Law, drift, refusal, and identity tests
 forge/                   # Minimal self-owned PaaS scripts, bootstrapper, and systemd unit
-cortex_forge/            # Forge HTTP control plane
+cortex_forge/            # Forge HTTP control plane and execution providers
 ledger/                  # Append-only JSONL witness streams
 runtime/                 # Permissions and runtime state
 scripts/                 # Data generation, chat, e2e, training utilities
@@ -321,6 +321,7 @@ python -m pytest \
   tests/test_deploy_service.py \
   tests/test_forge_bootstrap.py \
   tests/test_forge_server.py \
+  tests/test_github_actions_provider.py \
   tests/test_git_auth.py \
   tests/test_immune.py \
   tests/test_init.py \

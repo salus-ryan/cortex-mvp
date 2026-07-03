@@ -107,6 +107,8 @@ POST /forge/apps/{app}/rollback
 POST /forge/update
 POST /forge/deploy
 POST /forge/rollback
+POST /forge/actions/dispatch
+GET  /forge/actions/runs
 ```
 
 Mutation endpoints require `Authorization: Bearer $FORGE_TOKEN` when `FORGE_TOKEN` is set.
@@ -116,6 +118,34 @@ Mutation endpoints require `Authorization: Bearer $FORGE_TOKEN` when `FORGE_TOKE
 App-scoped mutation endpoints create jobs and return `202` immediately. Poll them at `/forge/jobs/{job_id}`.
 
 Configure multiple apps with `FORGE_APPS=/etc/cortex/apps.json`; see `forge/apps.example.json`.
+
+## No-VPS runner: GitHub Actions
+
+Forge can dispatch `.github/workflows/forge-ci.yml` as a no-VPS execution backend.
+
+Set:
+
+```bash
+FORGE_GITHUB_TOKEN=github_pat_or_token
+GITHUB_REPOSITORY=salus-ryan/cortex-mvp
+```
+
+Dispatch:
+
+```bash
+curl -X POST http://127.0.0.1:8765/forge/actions/dispatch \
+  -H "authorization: Bearer $FORGE_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"action":"test","witness":"ryan","confirmed":true,"ref":"master"}'
+```
+
+Actions supported:
+
+```text
+test
+build
+package
+```
 
 Example:
 

@@ -1,0 +1,111 @@
+name: Forge CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Forge action
+        required: true
+        type: choice
+        options:
+          - test
+          - build
+          - package
+      witness:
+        description: Human witness
+        required: true
+        type: string
+      confirmed:
+        description: Must be true
+        required: true
+        type: choice
+        options:
+          - "true"
+          - "false"
+      note:
+        description: Optional note
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  forge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse unless confirmed
+        if: ${{ inputs.confirmed != 'true' }}
+        run: |
+          echo "confirmed=true is required" >&2
+          exit 2
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install runtime test deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'pytest>=7.0.0' jsonschema==4.17.3 pyrsistent>=0.18.0
+
+      - name: Syntax check Forge scripts
+        run: bash -n forge/*.sh
+
+      - name: Run governed tests
+        if: ${{ inputs.action == 'test' || inputs.action == 'build' || inputs.action == 'package' }}
+        run: |
+          python -m pytest \
+            tests/test_sacred.py \
+            tests/test_build_loop.py \
+            tests/test_deliberation.py \
+            tests/test_deploy_service.py \
+            tests/test_forge_bootstrap.py \
+            tests/test_forge_dashboard.py \
+            tests/test_forge_server.py \
+            tests/test_git_auth.py \
+            tests/test_immune.py \
+            tests/test_init.py \
+            tests/test_local_mind.py \
+            tests/test_oracle.py \
+            tests/test_patch_service.py \
+            tests/test_payments.py \
+            tests/test_pid1.py \
+            tests/test_prophet.py \
+            tests/test_repo_service.py \
+            tests/test_self_train.py \
+            tests/test_service_server.py \
+            tests/test_services.py \
+            tests/test_missing_pieces.py \
+            tests/test_web.py \
+            -q
+
+      - name: Docker build
+        if: ${{ inputs.action == 'build' || inputs.action == 'package' }}
+        run: docker build -t cortex-mvp:forge-ci .
+
+      - name: Package Forge bundle
+        if: ${{ inputs.action == 'package' }}
+        run: |
+          mkdir -p dist
+          git archive --format=tar.gz --output=dist/cortex-mvp-${{ github.sha }}.tar.gz HEAD
+          cat > dist/forge-run.json <<JSON
+          {
+            "action": "${{ inputs.action }}",
+            "witness": "${{ inputs.witness }}",
+            "confirmed": "${{ inputs.confirmed }}",
+            "sha": "${{ github.sha }}",
+            "note": "${{ inputs.note }}"
+          }
+          JSON
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.action == 'package' }}
+        with:
+          name: cortex-forge-package
+          path: dist/
