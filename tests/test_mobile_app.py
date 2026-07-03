@@ -21,6 +21,7 @@ def test_mobile_files_exist():
     assert "/relationship/profile" in html
     assert "/relationship/converse" in html
     assert "/memory/forget" in html
+    assert "/oauth/status" in html
     assert "Export" in html
 
 

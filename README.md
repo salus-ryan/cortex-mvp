@@ -76,6 +76,8 @@ Open the installable mobile PWA:
 https://cortex-pid1-production.up.railway.app/mobile
 ```
 
+The mobile Home tab displays OAuth configuration status from `/oauth/status`. Use `/oauth/login` for provider login, then paste the returned `oauth_...` session into the Auth tab as the bearer value for mobile calls.
+
 No-browser mobile contract test:
 
 ```bash
