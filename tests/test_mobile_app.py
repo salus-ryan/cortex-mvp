@@ -17,6 +17,8 @@ def test_mobile_files_exist():
     html = Path("mobile/index.html").read_text()
     assert "mobile witness console" in html
     assert "localStorage.cortexToken" in html
+    assert "Share + remember" in html
+    assert "/relationship/profile" in html
 
 
 def test_cortex_mobile_served(tmp_path: Path, monkeypatch):

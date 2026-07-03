@@ -31,6 +31,7 @@ CAPABILITIES = {
 
 PATH_CAPABILITIES = {
     "/memory/write": "memory:write",
+    "/relationship/remember": "memory:write",
     "/tool/execute": "tool:execute",
     "/patch/apply": "patch:apply",
     "/build/apply": "build:apply",

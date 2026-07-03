@@ -59,6 +59,7 @@ class MobileE2E:
     def capability_for_path(self, path: str) -> str | None:
         return {
             "/memory/write": "memory:write",
+            "/relationship/remember": "memory:write",
             "/tool/execute": "tool:execute",
             "/patch/apply": "patch:apply",
             "/build/apply": "build:apply",
@@ -107,6 +108,9 @@ class MobileE2E:
         code, body, _ = self.request("/auth/status")
         auth = json.loads(body)
         self.expect("auth_status", code == 200 and "protected_paths" in auth, code=code, configured=auth.get("configured"), mode=auth.get("mode"), protected_paths=len(auth.get("protected_paths", {})), rate_limit=auth.get("rate_limit"), signed_intents_required=auth.get("signed_intents_required"))
+        code, body, _ = self.request("/relationship/profile")
+        profile = json.loads(body)
+        self.expect("relationship_profile", code == 200 and profile.get("status") == "ok" and "summary" in profile, code=code, status=profile.get("status"), facts=len(profile.get("facts", [])))
 
     def check_auth_boundary(self) -> None:
         try:

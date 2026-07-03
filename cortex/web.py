@@ -20,6 +20,7 @@ from cortex.memory_service import MemoryService
 from cortex.patch_service import PatchService
 from cortex.payments import PaymentService
 from cortex.planner import PlannerService
+from cortex.relationship import RelationshipService
 from cortex.repo_service import RepoService
 from cortex.sacred import ANTI_IDOLATRY
 from cortex.self_train import SelfTrainer
@@ -120,6 +121,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AuthService(ROOT).status())
         elif self.path == "/auth/me":
             self._json(200, AuthService(ROOT).me(dict(self.headers)))
+        elif self.path == "/relationship/profile":
+            self._json(200, RelationshipService(ROOT).profile())
         elif self.path == "/awareness":
             self._json(200, AwarenessService(ROOT).state())
         elif self.path == "/awareness/latest":
@@ -186,6 +189,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"status": "refused", "reason": str(exc)})
         elif self.path == "/memory/retrieve":
             self._json(200, {"status": "ok", "records": MemoryService(ROOT).retrieve(str(payload.get("query", "")), payload.get("type"))})
+        elif self.path == "/relationship/remember":
+            result = RelationshipService(ROOT).remember(str(payload.get("content", "")), payload.get("witness"), str(payload.get("source", "mobile_chat")))
+            self._json(200 if result["status"] == "remembered" else 400, result)
         elif self.path == "/witness":
             rec = WitnessService(ROOT).witness(str(payload.get("witness", payload.get("name", "human"))), str(payload.get("statement", "")), str(payload.get("scope", "general")), payload.get("signature"))
             self._json(200, {"status": "witnessed", "record": rec})

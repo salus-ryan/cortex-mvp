@@ -85,7 +85,9 @@ railway run -- scripts/mobile_e2e.py https://cortex-pid1-production.up.railway.a
 
 Auth is primitive: set `CORTEX_AUTH_TOKEN` to require bearer auth for protected material endpoints. The mobile app stores a human-provided token locally in the browser and sends it as `Authorization: Bearer ...`.
 
-Protected capabilities include deploy, patch/build apply, memory write, tool execute, payment checkout, immune quarantine, and self-training.
+Protected capabilities include deploy, patch/build apply, memory write, relationship memory, tool execute, payment checkout, immune quarantine, and self-training.
+
+The mobile `Know` tab lets the human talk with Cortex and explicitly choose `Share + remember`; those entries are stored as witnessed `personal` memory and surfaced through `/relationship/profile`.
 
 Optional hardening:
 
@@ -328,6 +330,7 @@ cortex/
 ├── patch_service.py     # Governed reversible patch validation/application
 ├── payments.py          # Lawful funding intents and optional checkout sessions
 ├── planner.py           # Self-organization planner; chooses but does not execute
+├── relationship.py      # Witnessed personal memory/profile layer
 ├── repo_service.py      # Repo status, diff, and allowlisted verification
 ├── pid1.py              # Literal container PID-1 supervisor
 ├── policy.py            # Authority and safety gatekeeper
@@ -397,6 +400,7 @@ python -m pytest \
   tests/test_pid1.py \
   tests/test_portable_linux.py \
   tests/test_prophet.py \
+  tests/test_relationship.py \
   tests/test_repo_service.py \
   tests/test_self_train.py \
   tests/test_services.py \
