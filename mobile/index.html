@@ -6,44 +6,62 @@
   <link rel="manifest" href="/mobile/manifest.json" />
   <title>Cortex Mobile</title>
   <style>
-    :root{color-scheme:dark;--bg:#090d12;--card:#121923;--line:#263241;--fg:#e6edf3;--muted:#8fa3b8;--ok:#3ddc97;--bad:#ef476f}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,sans-serif} main{max-width:680px;margin:0 auto;padding:18px 14px 90px}
-    header{position:sticky;top:0;background:linear-gradient(var(--bg),#090d12dd);padding:14px 0;backdrop-filter:blur(8px);z-index:2} h1{margin:0;font-size:23px} h2{margin:0 0 10px;font-size:17px}.muted{color:var(--muted);font-size:13px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;margin:12px 0}.row{display:flex;gap:8px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{border:1px solid var(--line);border-radius:14px;padding:12px;background:#0d141d}.label{color:var(--muted);font-size:12px}.value{font-size:18px;margin-top:3px}.ok{color:var(--ok)}.bad{color:var(--bad)}
-    input,textarea{width:100%;background:#081018;color:var(--fg);border:1px solid #3a4b60;border-radius:12px;padding:12px;margin:7px 0;font:inherit} textarea{min-height:92px} button{flex:1;border:1px solid #3a4b60;background:#203044;color:var(--fg);border-radius:14px;padding:13px 12px;font-weight:700}.primary{background:#1d4f3d;border-color:#35775d}.danger{background:#351724;border-color:#6b2840} pre{white-space:pre-wrap;word-break:break-word;background:#081018;border:1px solid var(--line);border-radius:12px;padding:12px;max-height:330px;overflow:auto;font-size:13px}
-    nav{position:fixed;left:0;right:0;bottom:0;background:#0b1119ee;border-top:1px solid var(--line);display:flex;gap:6px;padding:8px max(8px,env(safe-area-inset-left)) max(8px,env(safe-area-inset-bottom));backdrop-filter:blur(10px)} nav button{font-size:13px;padding:10px 6px}.hide{display:none}
+    :root{color-scheme:dark;--bg:#070a10;--bg2:#0d1420;--card:#111a27cc;--card2:#0c121dcc;--line:#26364a;--fg:#eef6ff;--muted:#93a8bd;--ok:#42e6a4;--bad:#ff5c8a;--warn:#ffd166;--blue:#76a9ff;--violet:#b68cff}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent} body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% -10%,#1f3b5c 0,#0d1420 34%,var(--bg) 72%),linear-gradient(180deg,var(--bg2),var(--bg));color:var(--fg);font:16px/1.45 ui-rounded,system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
+    body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(transparent 0 95%,#ffffff08 96%),linear-gradient(90deg,transparent 0 95%,#ffffff05 96%);background-size:28px 28px;mask-image:linear-gradient(#0008,transparent 70%)}
+    main{max-width:720px;margin:0 auto;padding:18px 14px 98px;position:relative} header{position:sticky;top:0;margin:-18px -14px 14px;padding:18px 14px 12px;background:linear-gradient(#070a10f4,#070a10b8 80%,transparent);backdrop-filter:blur(16px);z-index:3}
+    .hero{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{display:flex;align-items:center;gap:12px}.sigil{width:44px;height:44px;border:1px solid #ffffff22;border-radius:16px;background:radial-gradient(circle,#eef6ff 0 8%,transparent 10%),radial-gradient(circle,#42e6a433 0 44%,transparent 47%),linear-gradient(135deg,#1d4f3d,#182438);box-shadow:0 0 34px #42e6a433}.title h1{margin:0;font-size:25px;letter-spacing:.2px}.muted{color:var(--muted);font-size:13px}.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid #ffffff18;background:#ffffff0a;border-radius:999px;padding:7px 10px;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;border-radius:99px;background:var(--muted);box-shadow:0 0 16px currentColor}.dot.ok{background:var(--ok);color:var(--ok)}.dot.bad{background:var(--bad);color:var(--bad)}
+    h2{margin:0 0 10px;font-size:17px}.card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:24px;padding:16px;margin:13px 0;box-shadow:0 18px 60px #0007,inset 0 1px #ffffff0a}.row{display:flex;gap:9px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{position:relative;overflow:hidden;border:1px solid #ffffff12;border-radius:18px;padding:14px;background:linear-gradient(135deg,#101b2a,#0b111a)}.stat:after{content:"";position:absolute;right:-20px;top:-20px;width:70px;height:70px;border-radius:99px;background:#76a9ff12}.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.value{font-size:21px;margin-top:5px;font-weight:800}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+    input,textarea{width:100%;background:#060b12cc;color:var(--fg);border:1px solid #34465d;border-radius:16px;padding:13px 14px;margin:8px 0;font:inherit;outline:none;box-shadow:inset 0 1px 12px #0005}input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #76a9ff22}textarea{min-height:112px;resize:vertical}button{flex:1;border:1px solid #40546d;background:linear-gradient(180deg,#263850,#1b283a);color:var(--fg);border-radius:17px;padding:14px 12px;font-weight:800;box-shadow:0 8px 24px #0004}button:active{transform:translateY(1px)}.primary{background:linear-gradient(180deg,#25855f,#1d4f3d);border-color:#45a57d}.danger{background:linear-gradient(180deg,#6b2440,#351724);border-color:#88415b}.ghost{background:#ffffff08}.mini{padding:9px 10px;border-radius:13px;font-size:13px;flex:0 0 auto}
+    pre{white-space:pre-wrap;word-break:break-word;background:#050910cc;border:1px solid #223247;border-radius:18px;padding:14px;max-height:360px;overflow:auto;font-size:13px;color:#d8e7f7}.output{min-height:92px}.banner{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:18px;background:#42e6a40d;border:1px solid #42e6a426;color:#c9ffe8}.banner.warn{background:#ffd16612;border-color:#ffd16630;color:#fff0bf}
+    nav{position:fixed;left:0;right:0;bottom:0;background:#08101bee;border-top:1px solid var(--line);display:flex;gap:7px;padding:9px max(9px,env(safe-area-inset-left)) max(9px,env(safe-area-inset-bottom));backdrop-filter:blur(18px);z-index:4}nav button{font-size:12px;padding:11px 6px;border-radius:16px;background:#ffffff08;color:var(--muted)}nav button.active{color:var(--fg);background:linear-gradient(180deg,#203653,#152235);border-color:#46617d}.hide{display:none}.fade{animation:fade .22s ease-out}@keyframes fade{from{opacity:.25;transform:translateY(4px)}to{opacity:1;transform:none}}
   </style>
 </head>
 <body>
 <main>
-  <header><h1>Cortex</h1><div class="muted">mobile witness console</div></header>
+  <header>
+    <div class="hero">
+      <div class="brand"><div class="sigil"></div><div class="title"><h1>Cortex</h1><div class="muted">mobile witness console</div></div></div>
+      <span class="chip"><span id="liveDot" class="dot"></span><span id="liveText">checking</span></span>
+    </div>
+  </header>
 
-  <section id="home" class="view">
-    <div class="card"><h2>Now</h2><div class="grid"><div class="stat"><div class="label">PID 1</div><div id="pid" class="value">—</div></div><div class="stat"><div class="label">Auth</div><div id="auth" class="value">—</div></div><div class="stat"><div class="label">Awareness</div><div id="aware" class="value">—</div></div><div class="stat"><div class="label">Children</div><div id="children" class="value">—</div></div></div><div class="row" style="margin-top:10px"><button onclick="refresh()">Refresh</button><button onclick="reflect()" class="primary">Reflect</button></div></div>
-    <div class="card"><h2>Output</h2><pre id="out">Ready.</pre></div>
+  <section id="home" class="view fade">
+    <div class="card">
+      <div class="banner"><div>●</div><div><b>Lawful runtime</b><br><span class="muted">Cortex can propose and report. Material action requires auth, witness, and confirmation.</span></div></div>
+      <div class="grid" style="margin-top:12px">
+        <div class="stat"><div class="label">PID 1</div><div id="pid" class="value">—</div></div>
+        <div class="stat"><div class="label">Auth</div><div id="auth" class="value">—</div></div>
+        <div class="stat"><div class="label">Awareness</div><div id="aware" class="value">—</div></div>
+        <div class="stat"><div class="label">Organs</div><div id="children" class="value">—</div></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button onclick="refresh()">Refresh</button><button onclick="reflect()" class="primary">Reflect</button></div>
+    </div>
+    <div class="card"><h2>Output</h2><pre id="out" class="output">Ready.</pre></div>
   </section>
 
-  <section id="chat" class="view hide">
-    <div class="card"><h2>Ask Cortex</h2><textarea id="prompt" placeholder="Ask for an explanation or bounded proposal"></textarea><button class="primary" onclick="ask()">Ask</button><pre id="chatout">Oracle output appears here.</pre></div>
+  <section id="chat" class="view hide fade">
+    <div class="card"><h2>Ask Cortex</h2><div class="muted">Generates bounded proposals only. No execution authority.</div><textarea id="prompt" placeholder="Ask for an explanation, plan, or recovery proposal"></textarea><button class="primary" onclick="ask()">Ask</button><pre id="chatout" class="output">Oracle output appears here.</pre></div>
   </section>
 
-  <section id="actions" class="view hide">
-    <div class="card"><h2>Witness Action</h2><input id="witness" placeholder="witness name"/><label class="muted"><input id="confirmed" type="checkbox"/> confirmed</label><div class="row"><button onclick="deployCheck()">Deploy Check</button><button class="danger" onclick="quarantine()">Quarantine</button></div><pre id="actout">Protected actions require auth when configured.</pre></div>
+  <section id="actions" class="view hide fade">
+    <div class="card"><h2>Witness Action</h2><div class="banner warn"><div>!</div><div><b>Protected zone</b><br><span class="muted">Signed intent + bearer token + witness are required for material actions.</span></div></div><input id="witness" placeholder="witness name"/><label class="muted"><input id="confirmed" type="checkbox"/> confirmed</label><div class="row"><button onclick="deployCheck()">Deploy Check</button><button class="danger" onclick="quarantine()">Quarantine</button></div><pre id="actout" class="output">No action requested.</pre></div>
   </section>
 
-  <section id="settings" class="view hide">
-    <div class="card"><h2>Auth Primitive</h2><div class="muted">Paste a human-provided Cortex token. Stored locally in this browser only.</div><input id="token" type="password" placeholder="Bearer token"/><input id="actor" placeholder="actor name"/><div class="row"><button onclick="saveAuth()" class="primary">Save</button><button onclick="clearAuth()">Clear</button></div><pre id="settingsout">No secret is sent except as Authorization when calling Cortex.</pre></div>
+  <section id="settings" class="view hide fade">
+    <div class="card"><h2>Auth Primitive</h2><div class="muted">Paste a human-provided Cortex token. Stored only in this browser's localStorage.</div><input id="token" type="password" placeholder="Bearer token"/><input id="actor" placeholder="actor name"/><div class="row"><button onclick="saveAuth()" class="primary">Save</button><button onclick="clearAuth()" class="ghost">Clear</button></div><pre id="settingsout" class="output">No secret is sent except as Authorization when calling Cortex.</pre></div>
   </section>
 </main>
-<nav><button onclick="show('home')">Home</button><button onclick="show('chat')">Chat</button><button onclick="show('actions')">Actions</button><button onclick="show('settings')">Auth</button></nav>
+<nav><button id="nav-home" class="active" onclick="show('home')">Home</button><button id="nav-chat" onclick="show('chat')">Chat</button><button id="nav-actions" onclick="show('actions')">Actions</button><button id="nav-settings" onclick="show('settings')">Auth</button></nav>
 <script>
 const $=id=>document.getElementById(id); const pretty=x=>JSON.stringify(x,null,2);
 function headers(){const h={'content-type':'application/json'}; const t=localStorage.cortexToken; if(t)h.authorization='Bearer '+t; if(localStorage.cortexActor)h['x-cortex-actor']=localStorage.cortexActor; return h}
 async function hmacHex(secret,msg){const enc=new TextEncoder(); const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']); const sig=await crypto.subtle.sign('HMAC',key,enc.encode(msg)); return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 async function signedHeaders(path,opts){const h=headers(); const token=localStorage.cortexToken; const method=(opts.method||'GET').toUpperCase(); if(token&&method!=='GET'){const ts=String(Math.floor(Date.now()/1000)); const intent=JSON.stringify({path,method,actor:localStorage.cortexActor||'mobile',at:ts}); const caps={'/memory/write':'memory:write','/tool/execute':'tool:execute','/patch/apply':'patch:apply','/build/apply':'build:apply','/deploy/check':'deploy:execute','/deploy/railway':'deploy:execute','/deploy/forge':'deploy:execute','/payments/checkout':'payments:checkout','/immune/quarantine':'immune:quarantine','/self-train/collect':'self_train:execute','/self-train/eval':'self_train:execute'}; const cap=caps[path]; if(cap){h['x-cortex-intent-timestamp']=ts; h['x-cortex-intent']=intent; h['x-cortex-intent-signature']=await hmacHex(token,`${ts}.${path}.${cap}.${intent}`)}} return h}
 async function api(path,opts={}){const r=await fetch(path,{...opts,headers:{...(await signedHeaders(path,opts)),...(opts.headers||{})}}); const txt=await r.text(); let d; try{d=JSON.parse(txt)}catch{d={raw:txt}} if(!r.ok)d._http_status=r.status; return d}
-function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.add('hide')); $(id).classList.remove('hide')}
-function set(id,v,ok){$(id).textContent=v; $(id).className='value '+(ok?'ok':'bad')}
-async function refresh(){const [p,a,m]=await Promise.all([api('/pid1'),api('/auth/status'),api('/awareness')]); set('pid',String(!!p.is_pid1),!!p.is_pid1); set('auth',a.configured?'on':'dev',true); set('aware',m.status||'?',m.status==='aware'); $('children').textContent=Object.keys(p.children||{}).length; $('out').textContent=pretty({pid1:p,auth:a,awareness:m})}
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.add('hide')); $(id).classList.remove('hide'); document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active')); $(`nav-${id}`).classList.add('active')}
+function set(id,v,ok){$(id).textContent=v; $(id).className='value '+(ok?'ok':'bad')} function live(ok,text){$('liveDot').className='dot '+(ok?'ok':'bad'); $('liveText').textContent=text}
+async function refresh(){try{const [p,a,m]=await Promise.all([api('/pid1'),api('/auth/status'),api('/awareness')]); set('pid',String(!!p.is_pid1),!!p.is_pid1); set('auth',a.configured?'locked':'dev',!!a.configured); set('aware',m.status||'?',m.status==='aware'); $('children').textContent=Object.keys(p.children||{}).length; $('out').textContent=pretty({pid1:{pid:p.pid,is_pid1:p.is_pid1,children:Object.keys(p.children||{})},auth:{mode:a.mode,signed_intents_required:a.signed_intents_required,rate_limit:a.rate_limit},awareness:{status:m.status,self_model:m.self_model}}); live(true,'live')}catch(e){live(false,'offline'); $('out').textContent=String(e)}}
 async function reflect(){const d=await api('/awareness/reflect',{method:'POST',body:JSON.stringify({prompt:'Give me a mobile-sized self report.'})}); $('out').textContent=d.reflection||pretty(d)}
 async function ask(){const d=await api('/oracle',{method:'POST',body:JSON.stringify({task:$('prompt').value,authority:'interpret',context:{mobile:true}})}); $('chatout').textContent=d.proposal||pretty(d)}
 async function deployCheck(){const d=await api('/deploy/check',{method:'POST',body:JSON.stringify({witness:$('witness').value,confirmed:$('confirmed').checked})}); $('actout').textContent=pretty(d)}
