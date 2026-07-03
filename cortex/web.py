@@ -303,6 +303,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, TrajectoryScorer(ROOT).score())
         elif self.path == "/learning/export-sft":
             self._json(200, TrajectoryScorer(ROOT).export_sft(int(payload.get("min_score", 60))))
+        elif self.path == "/learning/package":
+            self._json(200, TrajectoryScorer(ROOT).package())
         elif self.path == "/memory/write":
             try:
                 rec = MemoryService(ROOT).write(str(payload.get("type", "inferred")), str(payload.get("content", "")), str(payload.get("source", "")), float(payload.get("confidence", 0.8)), payload.get("witness"))

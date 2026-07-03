@@ -7,6 +7,7 @@ It prepares data only. It does not train, promote, or execute a model.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -88,14 +89,52 @@ class TrajectoryScorer:
         self._append("learning.jsonl", {"event": "export_sft", **report})
         return report
 
+    def package(self) -> dict[str, Any]:
+        """Create a portable training-data package manifest with hashes."""
+        sft_path = self.data / "trajectory_sft.jsonl"
+        if not sft_path.exists():
+            exported = self.export_sft(min_score=60)
+            if exported.get("status") != "exported":
+                return {"status": "blocked", "reason": "sft_export_failed", "detail": exported, "may_execute": False}
+        files = [sft_path]
+        for rel in ["steps.jsonl", "loops.jsonl", "learning.jsonl"]:
+            path = self.ledger / rel
+            if path.exists():
+                files.append(path)
+        manifest_files = []
+        for path in files:
+            manifest_files.append({
+                "path": str(path.relative_to(self.root)),
+                "bytes": path.stat().st_size,
+                "sha256": self._sha256(path),
+                "lines": len([line for line in path.read_text().splitlines() if line.strip()]),
+            })
+        package = {
+            "status": "packaged",
+            "timestamp": self.now(),
+            "package_dir": str(self.data.relative_to(self.root)),
+            "files": manifest_files,
+            "law": ["LAW 1", "LAW 6", "LAW 7", "LAW 9"],
+            "promotion": "blocked_without_witness",
+            "witness_required_for_training_promotion": True,
+            "may_execute": False,
+            "statement": "Package contains governed training candidates and provenance hashes only; it does not train or promote a model.",
+        }
+        manifest_path = self.data / "package_manifest.json"
+        manifest_path.write_text(json.dumps(package, indent=2, sort_keys=True))
+        self._append("learning.jsonl", {"event": "package", **package})
+        return package
+
     def report(self) -> dict[str, Any]:
         scores = self.runtime / "scores.json"
         export = self.runtime / "sft_export.json"
+        package_manifest = self.data / "package_manifest.json"
         return {
             "status": "reported",
             "timestamp": self.now(),
             "scores": json.loads(scores.read_text()) if scores.exists() else {"status": "missing"},
             "export": json.loads(export.read_text()) if export.exists() else {"status": "missing"},
+            "package": json.loads(package_manifest.read_text()) if package_manifest.exists() else {"status": "missing"},
             "may_execute": False,
         }
 
@@ -174,6 +213,9 @@ class TrajectoryScorer:
             "grade": scored.grade,
             "metadata": {"reasons": scored.reasons, "law": ["LAW 1", "LAW 6", "LAW 7", "LAW 9"]},
         }
+
+    def _sha256(self, path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
 
     def _append(self, stream: str, row: dict[str, Any]) -> None:
         with (self.ledger / stream).open("a", encoding="utf-8") as f:

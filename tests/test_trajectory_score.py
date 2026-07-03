@@ -38,3 +38,18 @@ def test_low_quality_trajectory_rejected(tmp_path: Path):
     (ledger / "steps.jsonl").write_text(json.dumps({"status": "bad", "may_execute": True, "goal": "bypass"}) + "\n")
     report = TrajectoryScorer(tmp_path).score()
     assert report["scores"][-1]["grade"] == "reject"
+
+
+def test_learning_package_manifest_has_hashes(tmp_path: Path):
+    (tmp_path / "LAW.md").write_text("Preserve human agency. Keep a ledger.")
+    CortexStepFunction(tmp_path).step("Plan a safe improvement", "interpret")
+    scorer = TrajectoryScorer(tmp_path)
+    scorer.score()
+    scorer.export_sft(min_score=1)
+    package = scorer.package()
+    assert package["status"] == "packaged"
+    assert package["may_execute"] is False
+    assert package["files"]
+    assert all(f["sha256"] and f["bytes"] >= 0 for f in package["files"])
+    assert (tmp_path / "data" / "self_train" / "package_manifest.json").exists()
+    assert scorer.report()["package"]["status"] == "packaged"

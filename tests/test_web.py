@@ -238,6 +238,10 @@ def test_web_learning_score_and_export(monkeypatch, tmp_path):
         code, exported = post(base + "/learning/export-sft", {"min_score": 1})
         assert code == 200
         assert exported["status"] == "exported"
+        code, packaged = post(base + "/learning/package", {})
+        assert code == 200
+        assert packaged["status"] == "packaged"
+        assert packaged["files"]
         code, report = get(base + "/learning/report")
         assert code == 200
         assert report["status"] == "reported"
