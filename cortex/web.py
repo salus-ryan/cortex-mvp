@@ -26,6 +26,7 @@ from cortex.repo_service import RepoService
 from cortex.sacred import ANTI_IDOLATRY
 from cortex.self_train import SelfTrainer
 from cortex.services import InvocationPipeline
+from cortex.state_service import StateService
 from cortex.tool_algebra import ToolAlgebra
 from cortex.tool_gateway import ToolGateway
 from cortex.witness import WitnessService
@@ -125,6 +126,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, FoundryRegistry().plan())
         elif self.path == "/memory/export":
             self._json(200, MemoryService(ROOT).export())
+        elif self.path == "/state/manifest":
+            self._json(200, StateService(ROOT).manifest())
+        elif self.path == "/state/export":
+            self._json(200, StateService(ROOT).export())
         elif self.path == "/auth/status":
             self._json(200, AuthService(ROOT).status())
         elif self.path == "/auth/me":
@@ -203,6 +208,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"status": "forgotten", "record": rec, "may_execute": False})
             except Exception as exc:
                 self._json(400, {"status": "refused", "reason": str(exc), "may_execute": False})
+        elif self.path == "/state/import":
+            result = StateService(ROOT).import_bundle(dict(payload.get("bundle", {}) or {}), payload.get("witness"), bool(payload.get("confirmed", False)))
+            self._json(200 if result["status"] == "imported" else 403, result)
         elif self.path == "/relationship/remember":
             result = RelationshipService(ROOT).remember(str(payload.get("content", "")), payload.get("witness"), str(payload.get("source", "mobile_chat")))
             self._json(200 if result["status"] == "remembered" else 400, result)

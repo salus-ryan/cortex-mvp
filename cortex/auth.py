@@ -27,6 +27,7 @@ CAPABILITIES = {
     "payments:checkout",
     "immune:quarantine",
     "self_train:execute",
+    "state:import",
 }
 
 PATH_CAPABILITIES = {
@@ -44,6 +45,7 @@ PATH_CAPABILITIES = {
     "/immune/quarantine": "immune:quarantine",
     "/self-train/collect": "self_train:execute",
     "/self-train/eval": "self_train:execute",
+    "/state/import": "state:import",
 }
 
 

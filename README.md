@@ -175,6 +175,7 @@ curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
 curl "$BASE/payments/status"
 curl "$BASE/auth/status"
 curl "$BASE/foundry/plan"
+curl "$BASE/state/manifest"
 curl "$BASE/awareness"
 curl -X POST "$BASE/verify/claim" -H 'content-type: application/json' -d '{"claim":"Cortex runs as PID 1","evidence":["/pid1 returned pid 1 and is_pid1 true"]}'
 curl -X POST "$BASE/awareness/reflect" -H 'content-type: application/json' -d '{"prompt":"what are you?"}'
@@ -342,6 +343,7 @@ cortex/
 ├── runtime.py           # Main agent loop and state machine
 ├── sacred.py            # Ritual/canon CLI and ledger utilities
 ├── self_train.py        # Ledger-to-dataset self-training reports; no self-promotion
+├── state_service.py     # Private state vault export/import
 ├── services.py          # Guardian, Scribe, and invocation pipeline
 ├── specialists.py       # Local authority/risk/refusal specialists
 ├── tool_algebra.py      # PII taint, output validation, claim verification
@@ -408,6 +410,7 @@ python -m pytest \
   tests/test_relationship.py \
   tests/test_repo_service.py \
   tests/test_self_train.py \
+  tests/test_state_service.py \
   tests/test_services.py \
   tests/test_tool_algebra.py \
   tests/test_web.py -q
