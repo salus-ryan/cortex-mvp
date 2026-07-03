@@ -174,6 +174,7 @@ curl "$BASE/deploy/status"
 curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
 curl "$BASE/payments/status"
 curl "$BASE/auth/status"
+curl "$BASE/foundry/plan"
 curl "$BASE/awareness"
 curl -X POST "$BASE/awareness/reflect" -H 'content-type: application/json' -d '{"prompt":"what are you?"}'
 curl -X POST "$BASE/payments/intent" -H 'content-type: application/json' -d '{"amount_cents":500,"currency":"usd","purpose":"VPS fund"}'
@@ -323,6 +324,7 @@ cortex/
 ├── build_loop.py        # Governed build-loop orchestration
 ├── deliberation.py      # Multi-step local recommendation engine
 ├── deploy_service.py    # Witness-gated Railway/Cortex Forge deployment organ
+├── foundry.py           # Elevate Foundry research/import registry
 ├── immune.py            # Artificial immune system and quarantine memory
 ├── local_mind.py        # Local non-rented retrieval/synthesis cognition
 ├── memory_service.py    # Typed sourced JSONL memory service
@@ -385,6 +387,7 @@ python -m pytest \
   tests/test_deploy_service.py \
   tests/test_forge_bootstrap.py \
   tests/test_forge_server.py \
+  tests/test_foundry.py \
   tests/test_github_actions_provider.py \
   tests/test_git_auth.py \
   tests/test_immune.py \

@@ -13,6 +13,7 @@ from cortex.awareness import AwarenessService
 from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
 from cortex.deploy_service import DeployService
+from cortex.foundry import FoundryRegistry
 from cortex.immune import ImmuneService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
@@ -117,6 +118,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeployService(ROOT).report())
         elif self.path == "/payments/status":
             self._json(200, PaymentService(ROOT).status())
+        elif self.path == "/foundry/repos":
+            self._json(200, FoundryRegistry().repos())
+        elif self.path == "/foundry/plan":
+            self._json(200, FoundryRegistry().plan())
         elif self.path == "/memory/export":
             self._json(200, MemoryService(ROOT).export())
         elif self.path == "/auth/status":
