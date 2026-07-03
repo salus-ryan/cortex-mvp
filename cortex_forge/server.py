@@ -39,8 +39,15 @@ class ForgeState:
             f.write(json.dumps({"timestamp": self.now(), **record}, sort_keys=True) + "\n")
 
     def write_job(self, job: dict[str, Any]) -> dict[str, Any]:
-        (self.jobs / f"{job['id']}.json").write_text(json.dumps(job, indent=2, sort_keys=True))
-        (self.jobs / "latest.json").write_text(json.dumps(job, indent=2, sort_keys=True))
+        body = json.dumps(job, indent=2, sort_keys=True)
+        path = self.jobs / f"{job['id']}.json"
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(body)
+        tmp.replace(path)
+        latest = self.jobs / "latest.json"
+        latest_tmp = self.jobs / "latest.json.tmp"
+        latest_tmp.write_text(body)
+        latest_tmp.replace(latest)
         return job
 
     def start_job(self, app: str, kind: str, witness: str | None, target, *args: Any) -> dict[str, Any]:

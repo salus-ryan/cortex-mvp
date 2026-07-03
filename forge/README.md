@@ -37,6 +37,23 @@ cortex_forge/server.py                HTTP control plane: check/deploy/rollback/
 /var/log/cortex-forge
 ```
 
+## One-command host bootstrap
+
+On a fresh Ubuntu/Debian VPS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/salus-ryan/cortex-mvp/master/forge/bootstrap.sh -o bootstrap.sh
+sudo DOMAIN=cortex.example.com FORGE_TOKEN='choose-a-token' bash bootstrap.sh
+```
+
+This installs Docker/Caddy/git/Python, clones the repo to `/opt/cortex-mvp`, writes `/etc/cortex/apps.json`, installs the Forge systemd service, and configures Caddy.
+
+Dry-run locally:
+
+```bash
+DRY_RUN=1 DOMAIN=cortex.example.com FORGE_TOKEN=test forge/bootstrap.sh
+```
+
 ## Quick deploy
 
 From the repo root on the host:
