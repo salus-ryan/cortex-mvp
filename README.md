@@ -108,7 +108,8 @@ Current OIDC surface starts the provider login with PKCE and records state:
 
 ```bash
 curl "$BASE/oauth/status"
-curl "$BASE/oauth/login"
+curl "$BASE/oauth/login"   # JSON login URL
+# Phone shortcut: open $BASE/oauth/start to redirect directly to provider login
 # after provider redirect:
 # curl "$BASE/oauth/callback?code=...&state=..."
 curl "$BASE/oauth/me" -H 'authorization: Bearer oauth_session_value'

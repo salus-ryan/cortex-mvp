@@ -58,6 +58,11 @@ def get_with_headers(url, headers):
         return r.status, json.loads(r.read().decode())
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def test_web_invoke_accepts_and_ledger(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:
@@ -224,6 +229,14 @@ def test_web_oauth_status_and_login(monkeypatch, tmp_path):
         assert code == 200
         assert login["status"] == "login_url"
         assert "code_challenge" in login["authorization_url"]
+        opener = urllib.request.build_opener(NoRedirect)
+        req = urllib.request.Request(base + "/oauth/start", method="GET")
+        try:
+            opener.open(req, timeout=5)
+            raise AssertionError("expected redirect")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 302
+            assert "issuer.example/authorize" in exc.headers["location"]
     finally:
         server.shutdown()
 

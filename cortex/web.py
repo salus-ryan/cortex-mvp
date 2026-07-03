@@ -66,6 +66,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _html(self, code: int, html: str) -> None:
+        body = html.encode("utf-8")
+        self.send_response(code)
+        self.send_header("content-type", "text/html; charset=utf-8")
+        self.send_header("content-length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _redirect(self, location: str) -> None:
+        self.send_response(302)
+        self.send_header("location", location)
+        self.send_header("content-length", "0")
+        self.end_headers()
+
     def _sse_chat(self, model: str, content: str) -> None:
         self.send_response(200)
         self.send_header("content-type", "text/event-stream")
@@ -165,12 +179,22 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/oauth/login":
             result = OAuthService(ROOT).login()
             self._json(200 if result["status"] == "login_url" else 400, result)
+        elif path == "/oauth/start":
+            result = OAuthService(ROOT).login()
+            if result["status"] == "login_url":
+                self._redirect(str(result["authorization_url"]))
+            else:
+                self._json(400, result)
         elif path == "/oauth/callback":
             result = OAuthService(ROOT).callback(
                 code=(query.get("code") or [""])[0],
                 state=(query.get("state") or [""])[0],
             )
-            self._json(200 if result["status"] == "authenticated" else 403, result)
+            wants_html = "text/html" in (self.headers.get("accept") or self.headers.get("Accept") or "")
+            if wants_html:
+                self._html(200 if result["status"] == "authenticated" else 403, self._oauth_callback_html(result))
+            else:
+                self._json(200 if result["status"] == "authenticated" else 403, result)
         elif path == "/oauth/me":
             self._json(200, OAuthService(ROOT).me(dict(self.headers)))
         elif self.path == "/relationship/profile":
@@ -396,6 +420,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AwarenessService(ROOT).reflect(str(payload.get("prompt", ""))))
         else:
             self._json(404, {"status": "not_found"})
+
+    def _oauth_callback_html(self, result: dict[str, Any]) -> str:
+        status = str(result.get("status", "unknown"))
+        ok = status == "authenticated"
+        message = "Login accepted. Copy the session value from the JSON callback if you need CLI/mobile bearer auth." if ok else "Login was not accepted."
+        return f"""<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><title>Cortex OAuth</title><style>body{{background:#070a10;color:#eef6ff;font:16px system-ui;padding:22px}}a{{display:block;margin:14px 0;padding:14px;border-radius:14px;background:#1d4f3d;color:#eef6ff;text-decoration:none;border:1px solid #45a57d}}</style></head><body><h1>Cortex OAuth: {status}</h1><p>{message}</p><a href='/mobile'>Open Cortex Mobile</a><a href='/oauth/me'>Check OAuth Session</a></body></html>"""
 
     def _static_mobile(self, name: str, content_type: str = "text/html") -> None:
         path = ROOT / "mobile" / name
