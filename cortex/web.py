@@ -16,6 +16,7 @@ from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
 from cortex.patch_service import PatchService
+from cortex.payments import PaymentService
 from cortex.planner import PlannerService
 from cortex.repo_service import RepoService
 from cortex.sacred import ANTI_IDOLATRY
@@ -105,6 +106,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeployService(ROOT).status())
         elif self.path == "/deploy/report":
             self._json(200, DeployService(ROOT).report())
+        elif self.path == "/payments/status":
+            self._json(200, PaymentService(ROOT).status())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -114,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -208,6 +211,12 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/deploy/forge":
             result = DeployService(ROOT).forge(payload.get("witness"), bool(payload.get("confirmed", False)), payload.get("public_url"))
             self._json(200 if result["status"] == "deployed" else 403, result)
+        elif self.path == "/payments/intent":
+            result = PaymentService(ROOT).intent(int(payload.get("amount_cents", 0)), str(payload.get("purpose", "")), str(payload.get("currency", "usd")), payload.get("witness"))
+            self._json(200 if result["status"] == "intent_prepared" else 400, result)
+        elif self.path == "/payments/checkout":
+            result = PaymentService(ROOT).checkout(int(payload.get("amount_cents", 0)), str(payload.get("purpose", "")), str(payload.get("currency", "usd")), payload.get("witness"), bool(payload.get("confirmed", False)))
+            self._json(200 if result["status"] == "checkout_created" else 403, result)
         else:
             self._json(404, {"status": "not_found"})
 
