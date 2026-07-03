@@ -289,7 +289,8 @@ cortex/
 └── witness.py           # Witness/governance ledger primitives
 canon/                   # Canonical grammar and roles
 evals/                   # Law, drift, refusal, and identity tests
-forge/                   # Minimal self-owned PaaS scripts
+forge/                   # Minimal self-owned PaaS scripts and systemd unit
+cortex_forge/            # Forge HTTP control plane
 ledger/                  # Append-only JSONL witness streams
 runtime/                 # Permissions and runtime state
 scripts/                 # Data generation, chat, e2e, training utilities
@@ -314,6 +315,7 @@ python -m pytest \
   tests/test_build_loop.py \
   tests/test_deliberation.py \
   tests/test_deploy_service.py \
+  tests/test_forge_server.py \
   tests/test_git_auth.py \
   tests/test_immune.py \
   tests/test_init.py \

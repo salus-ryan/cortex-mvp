@@ -11,10 +11,13 @@ git checkout → docker build → docker run → healthcheck → rollback/log
 ## Components
 
 ```text
-forge/deploy.sh       Build and run a Docker deployment with rollback
-forge/healthcheck.sh  Verify live HTTP endpoints
-forge/install.sh      Prepare persistent directories on a Linux host
-forge/Caddyfile       Example HTTPS reverse proxy
+forge/deploy.sh                       Build and run a Docker deployment with rollback
+forge/healthcheck.sh                  Verify live HTTP endpoints
+forge/rollback.sh                     Restore a previous retained container when available
+forge/install.sh                      Prepare persistent directories on a Linux host
+forge/Caddyfile                       Example HTTPS reverse proxy
+forge/systemd/cortex-forge.service    Optional Forge API systemd service
+cortex_forge/server.py                HTTP control plane: check/deploy/rollback/job
 ```
 
 ## Host assumptions
@@ -47,6 +50,38 @@ With confirmation and witness:
 
 ```bash
 WITNESS=ryan CONFIRMED=true PUBLIC_URL=https://cortex.example.com forge/deploy.sh
+```
+
+## Forge API
+
+Run locally on the host:
+
+```bash
+FORGE_ROOT=/var/lib/cortex-forge \
+FORGE_REPO=/opt/cortex-mvp \
+FORGE_TOKEN='choose-a-token' \
+python -m cortex_forge.server
+```
+
+Endpoints:
+
+```http
+GET  /forge/status
+GET  /forge/check
+GET  /forge/job?id=latest
+POST /forge/deploy
+POST /forge/rollback
+```
+
+Mutation endpoints require `Authorization: Bearer $FORGE_TOKEN` when `FORGE_TOKEN` is set.
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8765/forge/deploy \
+  -H "authorization: Bearer $FORGE_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"witness":"ryan","confirmed":true,"public_url":"https://cortex.example.com"}'
 ```
 
 ## Safety model

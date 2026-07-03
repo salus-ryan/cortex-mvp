@@ -1,0 +1,20 @@
+[Unit]
+Description=Cortex Forge control plane
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cortex-mvp
+Environment=FORGE_ROOT=/var/lib/cortex-forge
+Environment=FORGE_REPO=/opt/cortex-mvp
+Environment=FORGE_HOST=127.0.0.1
+Environment=FORGE_PORT=8765
+EnvironmentFile=-/etc/cortex/forge.env
+ExecStart=/usr/bin/python3 -m cortex_forge.server
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
