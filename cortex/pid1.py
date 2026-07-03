@@ -49,7 +49,7 @@ class ChildState:
     stopped_at: str | None = None
 
 
-DEFAULT_CHILDREN = [
+FULL_CHILDREN = [
     ChildSpec(
         name="web",
         command=[sys.executable, "-m", "cortex.web"],
@@ -137,6 +137,33 @@ DEFAULT_CHILDREN = [
 ]
 
 
+COMPACT_CHILD_NAMES = {"web", "guardian", "scribe", "oracle", "memory", "immune"}
+TINY_CHILD_NAMES = {"web"}
+DEFAULT_CHILDREN = FULL_CHILDREN
+
+
+def child_specs_for_profile(profile: str | None = None, child_list: str | None = None) -> list[ChildSpec]:
+    """Return PID-1 child specs for an explicit compactness profile.
+
+    Profiles:
+    - full: all organs
+    - compact: web + law/log/oracle/memory/immune
+    - tiny: web only; endpoints use in-process fallbacks where possible
+
+    CORTEX_CHILDREN may override with a comma-separated allowlist.
+    """
+    specs = list(FULL_CHILDREN)
+    if child_list:
+        wanted = {name.strip() for name in child_list.split(",") if name.strip()}
+        return [spec for spec in specs if spec.name in wanted]
+    profile = (profile or os.environ.get("CORTEX_PROFILE", "full")).lower()
+    if profile == "compact":
+        return [spec for spec in specs if spec.name in COMPACT_CHILD_NAMES]
+    if profile == "tiny":
+        return [spec for spec in specs if spec.name in TINY_CHILD_NAMES]
+    return specs
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -154,7 +181,7 @@ def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
 
 class CortexPID1:
     def __init__(self, specs: list[ChildSpec] | None = None) -> None:
-        self.specs = DEFAULT_CHILDREN if specs is None else specs
+        self.specs = child_specs_for_profile(child_list=os.environ.get("CORTEX_CHILDREN")) if specs is None else specs
         self.children: dict[int, subprocess.Popen[str]] = {}
         self.states: dict[str, ChildState] = {
             spec.name: ChildState(spec.name, spec.command, spec.restart, spec.authority)

@@ -51,6 +51,7 @@ fi
 write_file "$TARGET/env/cortex.env" <<EOF
 PYTHONUNBUFFERED=1
 PUBLIC_URL=${PUBLIC_URL}
+CORTEX_PROFILE=compact
 CORTEX_LEDGER=/cortex-state/ledger
 CORTEX_MEMORY=/cortex-state/memory
 CORTEX_RUNTIME=/cortex-state/runtime

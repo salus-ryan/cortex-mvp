@@ -295,6 +295,8 @@ canon/                   # Canonical grammar and roles
 evals/                   # Law, drift, refusal, and identity tests
 forge/                   # Minimal self-owned PaaS scripts, bootstrapper, and systemd unit
 image/portable-linux/    # Portable USB layout; first step toward bootable Cortex thumb drive
+
+docs/COMPACT.md          # Full/compact/tiny runtime profiles
 cortex_forge/            # Forge HTTP control plane and execution providers
 ledger/                  # Append-only JSONL witness streams
 runtime/                 # Permissions and runtime state
@@ -318,6 +320,7 @@ Focused substrate tests:
 python -m pytest \
   tests/test_sacred.py \
   tests/test_build_loop.py \
+  tests/test_compact_pid1.py \
   tests/test_deliberation.py \
   tests/test_deploy_service.py \
   tests/test_forge_bootstrap.py \
