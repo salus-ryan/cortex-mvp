@@ -149,7 +149,7 @@ curl "$BASE/ledger/model-proposals.jsonl"
 curl "$BASE/ledger/next-steps.jsonl"
 ```
 
-`/model/propose` records external model output as an `untrusted_suggestion`, runs immune scanning, writes `ledger/model-proposals.jsonl`, and always returns `may_execute: false`. `/model/next-step` validates a proposal/action pairing and returns the next lawful checkpoint requirements without executing. `/step` runs one governed cycle: observe, propose, immune-scan, record proposal, compute next checkpoint when applicable, write project memory, log `ledger/steps.jsonl`, and stop with `may_execute: false`. `/loop` chains bounded `/step` cycles with stop conditions for max steps, immune escalation, repeated goals, lack of useful next goal, or human-confirmation requirements; it logs `ledger/loops.jsonl` and also returns `may_execute: false`. Material actions must still pass auth, signed intent, Guardian, witness, and ledger gates. If `CORTEX_REQUIRE_PROPOSAL_IDS=1`, material endpoints such as `/memory/write`, `/tool/execute`, `/patch/apply`, `/build/apply`, deploy, checkout, quarantine, self-training, and state import reject requests that do not include a matching `proposal_id`.
+`/model/propose` records external model output as an `untrusted_suggestion`, runs immune scanning, writes `ledger/model-proposals.jsonl`, and always returns `may_execute: false`. `/model/next-step` validates a proposal/action pairing and returns the next lawful checkpoint requirements without executing. `/step` runs one governed cycle: observe, propose, immune-scan, record proposal, compute next checkpoint when applicable, write project memory, log `ledger/steps.jsonl`, and stop with `may_execute: false`. `/loop` chains bounded `/step` cycles with stop conditions for max steps, immune escalation, repeated goals, lack of useful next goal, or human-confirmation requirements; it logs `ledger/loops.jsonl` and also returns `may_execute: false`. `/learning/score` scores step/loop trajectories and `/learning/export-sft` exports usable traces to `data/self_train/trajectory_sft.jsonl`; learning outputs prepare data only and cannot promote model weights. Material actions must still pass auth, signed intent, Guardian, witness, and ledger gates. If `CORTEX_REQUIRE_PROPOSAL_IDS=1`, material endpoints such as `/memory/write`, `/tool/execute`, `/patch/apply`, `/build/apply`, deploy, checkout, quarantine, self-training, and state import reject requests that do not include a matching `proposal_id`.
 
 ## Start local dashboard
 
@@ -259,6 +259,11 @@ curl -X POST "$BASE/tool/execute" \
 curl -X POST "$BASE/self-train/collect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/self-train/eval" -H 'content-type: application/json' -d '{}'
 curl "$BASE/self-train/report"
+
+curl -X POST "$BASE/learning/score" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/learning/export-sft" -H 'content-type: application/json' -d '{"min_score":60}'
+curl "$BASE/learning/report"
+curl "$BASE/ledger/learning.jsonl"
 
 curl "$BASE/ledger/actions.jsonl"
 curl "$BASE/ledger/refusals.jsonl"

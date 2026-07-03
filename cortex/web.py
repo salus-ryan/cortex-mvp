@@ -33,6 +33,7 @@ from cortex.state_service import StateService
 from cortex.step_function import CortexStepFunction
 from cortex.tool_algebra import ToolAlgebra
 from cortex.tool_gateway import ToolGateway
+from cortex.trajectory_score import TrajectoryScorer
 from cortex.trust_boundary import TrustBoundaryService
 from cortex.witness import WitnessService
 
@@ -191,9 +192,11 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"status": "ok", "records": MemoryService(ROOT).retrieve(typ=typ if typ else None)})
         elif self.path == "/self-train/report":
             self._json(200, SelfTrainer(ROOT).report())
+        elif self.path == "/learning/report":
+            self._json(200, TrajectoryScorer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl", "loops.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl", "loops.jsonl", "learning.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -296,6 +299,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/self-train/eval":
             result = SelfTrainer(ROOT).eval()
             self._json(200 if result["status"] in {"pass", "blocked"} else 500, result)
+        elif self.path == "/learning/score":
+            self._json(200, TrajectoryScorer(ROOT).score())
+        elif self.path == "/learning/export-sft":
+            self._json(200, TrajectoryScorer(ROOT).export_sft(int(payload.get("min_score", 60))))
         elif self.path == "/memory/write":
             try:
                 rec = MemoryService(ROOT).write(str(payload.get("type", "inferred")), str(payload.get("content", "")), str(payload.get("source", "")), float(payload.get("confidence", 0.8)), payload.get("witness"))

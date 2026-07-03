@@ -228,6 +228,26 @@ def test_web_oauth_status_and_login(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_learning_score_and_export(monkeypatch, tmp_path):
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        post(base + "/step", {"goal": "Create learning signal", "authority": "interpret"})
+        code, scored = post(base + "/learning/score", {})
+        assert code == 200
+        assert scored["status"] == "scored"
+        code, exported = post(base + "/learning/export-sft", {"min_score": 1})
+        assert code == 200
+        assert exported["status"] == "exported"
+        code, report = get(base + "/learning/report")
+        assert code == 200
+        assert report["status"] == "reported"
+        code, ledger = get(base + "/ledger/learning.jsonl")
+        assert code == 200
+        assert ledger["records"]
+    finally:
+        server.shutdown()
+
+
 def test_web_loop(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:
