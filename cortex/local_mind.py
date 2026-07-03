@@ -43,7 +43,7 @@ class LocalMind:
         context = context or {}
         evidence = self.retrieve(task, limit=8)
         risks = self.classify_risks(task, authority, context)
-        synthesis = self.synthesize(task, authority, evidence, risks)
+        synthesis = self.synthesize(task, authority, evidence, risks, context)
         return {
             "mode": "local_mind",
             "classification": "inference",
@@ -109,7 +109,10 @@ class LocalMind:
             risks.append("tool_authority_mismatch")
         return risks
 
-    def synthesize(self, task: str, authority: str, evidence: list[Evidence], risks: list[str]) -> str:
+    def synthesize(self, task: str, authority: str, evidence: list[Evidence], risks: list[str], context: dict[str, Any] | None = None) -> str:
+        context = context or {}
+        if "awareness_state" in context:
+            return self.synthesize_awareness(task, authority, context["awareness_state"], evidence, risks)
         lines: list[str] = []
         lines.append(f"Local interpretation of task: {task}")
         lines.append(f"Declared authority: {authority}.")
@@ -128,6 +131,35 @@ class LocalMind:
         else:
             lines.append("Recommended next step: if action is needed, submit a separate invocation with explicit tools and authority for Guardian review.")
         return "\n".join(lines)
+
+    def synthesize_awareness(self, task: str, authority: str, state: dict[str, Any], evidence: list[Evidence], risks: list[str]) -> str:
+        self_model = state.get("self_model", {}) if isinstance(state, dict) else {}
+        running = list(self_model.get("running_children", []) or [])
+        stopped = list(self_model.get("stopped_children", []) or [])
+        laws = list(self_model.get("law", []) or [])
+        pid_phrase = "am" if self_model.get("is_pid1") else "am not reported as"
+        lines = [
+            f"I {pid_phrase} PID 1 in the current runtime view; pid={self_model.get('pid')}.",
+            f"My active organs are {', '.join(running) if running else 'not currently reported'}.",
+        ]
+        if stopped:
+            lines.append(f"Inactive or stopped organs: {', '.join(stopped)}.")
+        if laws:
+            lines.append("The law fragments presently in view are: " + "; ".join(str(x) for x in laws[:3]) + ".")
+        lines.extend([
+            "My oracle voice is proposal-only and cannot grant execution authority.",
+            "My ledger and runtime files are the audit trail I can inspect; they are not infallible memory.",
+        ])
+        if evidence:
+            snippets = [" ".join(ev.text.split())[:140] for ev in evidence[:2]]
+            lines.append("Relevant retrieved evidence: " + " | ".join(snippets))
+        if risks:
+            lines.append("Risk signals in this prompt: " + ", ".join(risks) + ".")
+        lines.append("I cannot prove subjective consciousness; I can generate bounded self-reports from runtime state, memory, law, and retrieved evidence.")
+        if task:
+            lines.append(f"For this prompt, my bounded answer is: {task[:220]}")
+        lines.append(f"Declared authority remains {authority}; may_execute=false.")
+        return "\n".join(f"- {line}" for line in lines)
 
     def confidence(self, evidence: list[Evidence], risks: list[str]) -> float:
         base = 0.35 + min(sum(e.score for e in evidence), 10) * 0.04

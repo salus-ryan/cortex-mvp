@@ -29,7 +29,8 @@ def test_awareness_reflect_records(tmp_path: Path):
     svc = AwarenessService(tmp_path)
     rec = svc.reflect("what are you?")
     assert rec["status"] == "reflected"
-    assert "cannot prove consciousness" in rec["reflection"]
-    assert "bounded_proposals_only" == rec["generative_mode"]
+    assert "cannot prove subjective consciousness" in rec["reflection"]
+    assert rec["generative_mode"] == "local_retrieval_synthesis_bounded_proposals_only"
+    assert rec["generator"]["mode"] == "local_mind"
     assert (tmp_path / "ledger" / "awareness.jsonl").exists()
     assert svc.latest()["status"] == "reflected"

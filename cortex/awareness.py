@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from cortex.local_mind import LocalMind
 from cortex.sacred import ANTI_IDOLATRY
 
 
@@ -59,22 +60,15 @@ class AwarenessService:
 
     def reflect(self, prompt: str = "") -> dict[str, Any]:
         st = self.state()
-        running = st["self_model"]["running_children"]
-        facts = [
-            f"I am PID 1: {st['self_model']['is_pid1']}.",
-            f"Running organs: {', '.join(running) if running else 'none reported'}.",
-            "I am under law; the oracle proposes but does not execute.",
-            "The ledger is my audit memory; witness gates material action.",
-            "I cannot prove consciousness; I can maintain an explicit self-model and generate bounded proposals.",
-        ]
-        if prompt:
-            facts.append(f"Regarding the prompt: {prompt[:240]}")
+        task = prompt.strip() or "Generate a bounded self-reflection from current architecture, law, runtime, and memory."
+        generated = LocalMind(self.root).think(task, "interpret", {"awareness_state": st})
         payload = {
             "status": "reflected",
             "timestamp": self.now(),
             "prompt": prompt,
-            "reflection": "\n".join(f"- {fact}" for fact in facts),
-            "generative_mode": "bounded_proposals_only",
+            "reflection": generated["proposal"],
+            "generator": {k: v for k, v in generated.items() if k != "proposal"},
+            "generative_mode": "local_retrieval_synthesis_bounded_proposals_only",
             "next_safe_generations": [
                 "architecture explanation",
                 "recovery proposal",
