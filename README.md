@@ -96,9 +96,28 @@ CORTEX_REQUIRE_SIGNED_INTENTS=1
 CORTEX_INTENT_TTL_SECONDS=300
 CORTEX_AUTH_MAX_FAILURES=8
 CORTEX_AUTH_WINDOW_SECONDS=60
+CORTEX_REQUIRE_PROPOSAL_IDS=1
 ```
 
-When enabled, protected POST actions also require a short-lived HMAC signed intent over path, capability, timestamp, and intent JSON.
+When enabled, protected POST actions also require a short-lived HMAC signed intent over path, capability, timestamp, and intent JSON. `CORTEX_REQUIRE_PROPOSAL_IDS=1` additionally requires material actions to reference a prior `/model/propose` record by `proposal_id`.
+
+Pi/rented-intelligence boundary hardening:
+
+```bash
+curl -X POST "$BASE/model/propose" \
+  -H 'content-type: application/json' \
+  -d '{"actor":"pi","proposer":"rented-model","content":"Propose a safe patch review","intent":{"capability":"patch:apply"}}'
+
+curl -X POST "$BASE/model/next-step" \
+  -H 'content-type: application/json' \
+  -d '{"proposal_id":"proposal_...","path":"/patch/apply","payload":{"patch":"diff ..."}}'
+
+curl "$BASE/model/proposals"
+curl "$BASE/ledger/model-proposals.jsonl"
+curl "$BASE/ledger/next-steps.jsonl"
+```
+
+`/model/propose` records external model output as an `untrusted_suggestion`, runs immune scanning, writes `ledger/model-proposals.jsonl`, and always returns `may_execute: false`. `/model/next-step` validates a proposal/action pairing and returns the next lawful checkpoint requirements without executing. Material actions must still pass auth, signed intent, Guardian, witness, and ledger gates. If `CORTEX_REQUIRE_PROPOSAL_IDS=1`, material endpoints such as `/memory/write`, `/tool/execute`, `/patch/apply`, `/build/apply`, deploy, checkout, quarantine, self-training, and state import reject requests that do not include a matching `proposal_id`.
 
 ## Start local dashboard
 

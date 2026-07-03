@@ -183,6 +183,67 @@ def test_web_missing_pieces(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_model_next_step(monkeypatch, tmp_path):
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        code, proposal = post(base + "/model/propose", {
+            "content": "Prepare a reviewed memory write.",
+            "intent": {"path": "/memory/write", "capability": "memory:write"},
+        })
+        assert code == 200
+        code, step = post(base + "/model/next-step", {
+            "proposal_id": proposal["id"],
+            "path": "/memory/write",
+            "payload": {"type": "factual", "content": "x", "source": "test"},
+        })
+        assert code == 200
+        assert step["status"] == "ready_for_human_confirmation"
+        assert step["capability"] == "memory:write"
+        assert step["may_execute"] is False
+        assert "proposal_id" in step["requires"]
+        code, ledger = get(base + "/ledger/next-steps.jsonl")
+        assert code == 200
+        assert ledger["records"]
+    finally:
+        server.shutdown()
+
+
+def test_web_requires_proposal_id_for_material_action(monkeypatch, tmp_path):
+    monkeypatch.setenv("CORTEX_REQUIRE_PROPOSAL_IDS", "1")
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        req = urllib.request.Request(
+            base + "/memory/write",
+            data=json.dumps({"type": "factual", "content": "Cortex has memory", "source": "test"}).encode(),
+            headers={"content-type": "application/json"},
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(req, timeout=5)
+            raise AssertionError("expected proposal refusal")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403
+            data = json.loads(exc.read().decode())
+            assert data["trust_boundary"]["reason"] == "missing_proposal_id"
+
+        code, proposal = post(base + "/model/propose", {
+            "content": "Remember a factual test record.",
+            "intent": {"path": "/memory/write", "capability": "memory:write"},
+        })
+        assert code == 200
+        code, remembered = post(base + "/memory/write", {
+            "proposal_id": proposal["id"],
+            "type": "factual",
+            "content": "Cortex has memory",
+            "source": "test",
+        })
+        assert code == 200
+        assert remembered["status"] == "remembered"
+    finally:
+        server.shutdown()
+        monkeypatch.delenv("CORTEX_REQUIRE_PROPOSAL_IDS", raising=False)
+
+
 def test_web_self_test(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:

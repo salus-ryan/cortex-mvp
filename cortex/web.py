@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from cortex.auth import AuthService
+from cortex.auth import AuthService, PATH_CAPABILITIES
 from cortex.awareness import AwarenessService
 from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
@@ -29,9 +29,27 @@ from cortex.services import InvocationPipeline
 from cortex.state_service import StateService
 from cortex.tool_algebra import ToolAlgebra
 from cortex.tool_gateway import ToolGateway
+from cortex.trust_boundary import TrustBoundaryService
 from cortex.witness import WitnessService
 
 ROOT = Path(os.environ.get("CORTEX_ROOT", os.getcwd())).resolve()
+
+MATERIAL_PROPOSAL_PATHS = {
+    "/memory/write",
+    "/memory/forget",
+    "/relationship/remember",
+    "/relationship/converse",
+    "/tool/execute",
+    "/patch/apply",
+    "/build/apply",
+    "/deploy/railway",
+    "/deploy/forge",
+    "/payments/checkout",
+    "/immune/quarantine",
+    "/self-train/collect",
+    "/self-train/eval",
+    "/state/import",
+}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -140,6 +158,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AwarenessService(ROOT).state())
         elif self.path == "/awareness/latest":
             self._json(200, AwarenessService(ROOT).latest())
+        elif self.path == "/model/proposals":
+            self._json(200, TrustBoundaryService(ROOT).latest())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
         elif self.path.startswith("/memory/"):
@@ -149,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, SelfTrainer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -168,6 +188,17 @@ class Handler(BaseHTTPRequestHandler):
             self._json(int(auth_refusal.pop("http_status", 401)), auth_refusal)
             return
 
+        if self.path in MATERIAL_PROPOSAL_PATHS:
+            proposal_id = payload.get("proposal_id") or self.headers.get("x-cortex-proposal-id") or self.headers.get("X-Cortex-Proposal-Id")
+            proposal_decision = TrustBoundaryService(ROOT).validate_for_action(
+                str(proposal_id) if proposal_id else None,
+                self.path,
+                PATH_CAPABILITIES.get(self.path),
+            )
+            if not proposal_decision["allowed"]:
+                self._json(403, {"status": "refused", "trust_boundary": proposal_decision, "may_execute": False})
+                return
+
         pipeline = InvocationPipeline(ROOT)
         scribe = ScribeClient(ROOT)
         if self.path == "/v1/chat/completions":
@@ -183,6 +214,25 @@ class Handler(BaseHTTPRequestHandler):
                 result = OracleClient(ROOT).propose(task, str(payload.get("authority", "interpret")), payload.get("context", {}))
                 scribe.append("actions.jsonl", {"actor": "web.oracle", "action_type": "oracle_proposal", "status": "proposed", "oracle": result})
                 self._json(200, result)
+        elif self.path == "/model/propose":
+            rec = TrustBoundaryService(ROOT).record_proposal(
+                content=str(payload.get("content", payload.get("proposal", ""))),
+                proposer=str(payload.get("proposer", "rented-intelligence")),
+                actor=str(payload.get("actor", "pi")),
+                channel=str(payload.get("channel", "api")),
+                intent=dict(payload.get("intent", {}) or {}),
+                witness=payload.get("witness"),
+            )
+            self._json(200 if rec["status"] in {"recorded", "quarantined"} else 400, rec)
+        elif self.path == "/model/next-step":
+            path = str(payload.get("path", ""))
+            rec = TrustBoundaryService(ROOT).next_step(
+                proposal_id=str(payload.get("proposal_id", "")) or None,
+                path=path,
+                capability=str(payload.get("capability", PATH_CAPABILITIES.get(path, ""))) or None,
+                payload=dict(payload.get("payload", {}) or {}),
+            )
+            self._json(200 if rec["status"] == "ready_for_human_confirmation" else 403, rec)
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)
