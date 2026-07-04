@@ -281,6 +281,11 @@ curl -X POST "$BASE/patch/check" -H 'content-type: application/json' -d '{"patch
 curl -X POST "$BASE/build/propose" -H 'content-type: application/json' -d '{"task":"make a safe improvement"}'
 curl "$BASE/build/report"
 curl "$BASE/deploy/status"
+curl "$BASE/embodiment/iso-report"
+curl "$BASE/embodiment/persistent-state"
+curl "$BASE/embodiment/recovery-secure-boot"
+curl "$BASE/witness/policy"
+curl "$BASE/ledger/mirror"
 curl -X POST "$BASE/deploy/check" -H 'content-type: application/json' -d '{}'
 curl "$BASE/payments/status"
 curl "$BASE/auth/status"
@@ -429,11 +434,13 @@ The system has two connected strata.
 15. **Deploy Service (`cortex.deploy_service`)**: Witness-gated Railway and Cortex Forge deploy preflight/allowlisted commands.
 16. **Payment Rails (`cortex.payments`)**: Funding intents and optional witnessed Stripe Checkout; no direct charging or card storage.
 17. **Tool Gateway/Registry (`cortex.tool_gateway`, `cortex.tool_registry`)**: Bounded tools through Guardian/Scribe with fine-grained required capabilities, sandbox profiles, and objective postcondition coverage.
+18. **Embodiment (`cortex.embodiment`)**: Live USB layout, ISO artifact, state partition, recovery-shell, and boot-attestation reports without writing media.
 18. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
 19. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
 20. **Trajectory Learning (`cortex.trajectory_score`)**: Scores trajectories, exports SFT candidates, packages provenance, checks drift, and gates promotion objectively without self-promotion.
 21. **World Interface (`cortex.world_interface`)**: Durable event bus, evidence-backed sensory adapter inventory, and operator console for human proposal review.
-22. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+22. **Ledger Mirror (`cortex.ledger_mirror`)**: Tamper-evident hash-chain manifest for external ledger mirroring.
+23. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 

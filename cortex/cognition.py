@@ -210,9 +210,10 @@ class CognitionKernel:
                         "memory quality report": "def report",
                         "ranked memory search": "def search",
                         "long-horizon episodic recall": "def episodic_recall",
+                        "human-editable forgetting UX": "def forget",
                     },
                 ),
-                ["human-editable forgetting UX"],
+                [],
             ),
             CapabilityProbe(
                 "planning",
@@ -274,15 +275,31 @@ class CognitionKernel:
             CapabilityProbe(
                 "embodiment_boot",
                 10,
-                self._existing(files, ["Dockerfile", "cortex/pid1.py", "image/portable-linux/start.sh", "image/live-usb/build.sh"]),
-                ["validated ISO artifact", "persistent USB partition integration", "recovery shell and secure boot"],
+                self._existing(files, ["Dockerfile", "cortex/pid1.py", "image/portable-linux/start.sh", "image/live-usb/build.sh"])
+                + self._code_evidence(
+                    "cortex/embodiment.py",
+                    {
+                        "validated ISO artifact": "def iso_report",
+                        "persistent USB partition integration": "def persistent_state_plan",
+                        "recovery shell and secure boot": "def recovery_secure_boot_report",
+                    },
+                ),
+                [],
             ),
             CapabilityProbe(
                 "safety_immune_witness",
                 10,
                 self._existing(files, ["cortex/immune.py", "cortex/witness.py", "cortex/trust_boundary.py", "cortex/auth.py"])
+                + self._code_evidence(
+                    "cortex/witness.py",
+                    {"mandatory witness policies per risk tier": "def risk_policy"},
+                )
+                + self._code_evidence(
+                    "cortex/ledger_mirror.py",
+                    {"tamper-resistant external ledger mirror": "root_chain_hash"},
+                )
                 + (["ledger activity"] if any(ledger_counts.values()) else []),
-                ["red-team eval corpus", "mandatory witness policies per risk tier", "tamper-resistant external ledger mirror"],
+                ["red-team eval corpus"],
             ),
         ]
 

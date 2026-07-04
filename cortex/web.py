@@ -16,9 +16,11 @@ from cortex.cognition import CognitionKernel
 from cortex.concept_graph import ConceptGraphService
 from cortex.deliberation import DeliberationService
 from cortex.deploy_service import DeployService
+from cortex.embodiment import EmbodimentService
 from cortex.file_mentions import enrich_text_with_file_mentions
 from cortex.foundry import FoundryRegistry
 from cortex.immune import ImmuneService
+from cortex.ledger_mirror import LedgerMirrorService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
@@ -158,6 +160,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeliberationService(ROOT).latest())
         elif self.path == "/immune/report":
             self._json(200, ImmuneService(ROOT).report())
+        elif path == "/ledger/mirror":
+            self._json(200, LedgerMirrorService(ROOT).manifest())
         elif self.path == "/immune/memory":
             self._json(200, {"status": "ok", "records": ImmuneService(ROOT).memory_records()})
         elif self.path == "/repo/status":
@@ -172,6 +176,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeployService(ROOT).status())
         elif self.path == "/deploy/report":
             self._json(200, DeployService(ROOT).report())
+        elif path == "/embodiment/iso-report":
+            self._json(200, EmbodimentService(ROOT).iso_report((query.get("path") or [None])[0]))
+        elif path == "/embodiment/persistent-state":
+            self._json(200, EmbodimentService(ROOT).persistent_state_plan())
+        elif path == "/embodiment/recovery-secure-boot":
+            self._json(200, EmbodimentService(ROOT).recovery_secure_boot_report())
         elif self.path == "/payments/status":
             self._json(200, PaymentService(ROOT).status())
         elif path == "/tools/report":
@@ -254,6 +264,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, TrustBoundaryService(ROOT).latest())
         elif self.path == "/witnesses":
             self._json(200, {"status": "ok", "witnesses": WitnessService(ROOT).list()})
+        elif path == "/witness/policy":
+            self._json(200, WitnessService(ROOT).risk_policy())
         elif self.path.startswith("/memory/"):
             typ = self.path.removeprefix("/memory/") or None
             self._json(200, {"status": "ok", "records": MemoryService(ROOT).retrieve(typ=typ if typ else None)})
