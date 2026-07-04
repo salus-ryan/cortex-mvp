@@ -11,6 +11,9 @@ build/
 venv/
 *.log
 models/
+data/cortex.db
+data/*.db-shm
+data/*.db-wal
 data/trajectories/
 data/scl_corpus.jsonl
 data/sft/
