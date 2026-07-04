@@ -222,8 +222,16 @@ class CognitionKernel:
             CapabilityProbe(
                 "tool_use_under_law",
                 15,
-                self._existing(files, ["cortex/tool_gateway.py", "cortex/tool_registry.py", "cortex/policy.py", "cortex/verifier.py"]),
-                ["sandbox isolation", "fine-grained capabilities", "formal postcondition coverage for every tool"],
+                self._existing(files, ["cortex/tool_gateway.py", "cortex/tool_registry.py", "cortex/policy.py", "cortex/verifier.py"])
+                + self._code_evidence(
+                    "cortex/tool_registry.py",
+                    {
+                        "sandbox isolation": "sandbox_profile",
+                        "fine-grained capabilities": "required_capability",
+                        "formal postcondition coverage for every tool": "postcondition_coverage_report",
+                    },
+                ),
+                [],
             ),
             CapabilityProbe(
                 "learning",

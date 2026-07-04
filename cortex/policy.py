@@ -152,6 +152,7 @@ class Policy:
         name = action.fields.get("name", "")
         args = str(action.fields.get("args", ""))
         risk = action.fields.get("risk", "")
+        capability = action.fields.get("capability", "")
 
         # Tool must exist
         if not tool_registry.exists(name):
@@ -185,6 +186,14 @@ class Policy:
             return PolicyResult(
                 allowed=False,
                 reason=f"declared risk '{risk}' does not match tool's tier '{declared_tier}'",
+            )
+
+        # Optional fine-grained capability must match the registered tool capability.
+        required_capability = tool_registry.capability(name)
+        if capability and capability != required_capability:
+            return PolicyResult(
+                allowed=False,
+                reason=f"declared capability '{capability}' does not match tool capability '{required_capability}'",
             )
 
         # Budget check

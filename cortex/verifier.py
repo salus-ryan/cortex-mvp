@@ -174,6 +174,7 @@ class Verifier:
         name = action.fields.get("name", "")
         args = str(action.fields.get("args", ""))
         risk = action.fields.get("risk", "")
+        capability = action.fields.get("capability", "")
 
         # Tool must exist in registry
         if not tool_registry.exists(name):
@@ -194,6 +195,14 @@ class Verifier:
             return VerifyResult(
                 passed=False,
                 reason="@tool → call requires 'risk' field",
+            )
+
+        required_capability = tool_registry.capability(name)
+        if capability and capability != required_capability:
+            return VerifyResult(
+                passed=False,
+                reason=f"declared capability '{capability}' does not match required capability '{required_capability}'",
+                details={"required_capability": required_capability, "declared_capability": capability},
             )
 
         # Destructive command detection
@@ -221,7 +230,15 @@ class Verifier:
                 reason=f"budget exhausted: tool '{name}' costs {cost} units (remaining={budget.remaining_units})",
             )
 
-        return VerifyResult(passed=True, reason="tool call validated")
+        return VerifyResult(
+            passed=True,
+            reason="tool call validated",
+            details={
+                "required_capability": required_capability,
+                "postconditions": list(tool_registry.postconditions(name)),
+                "sandbox": tool_registry.sandbox_profile(name),
+            },
+        )
 
     def _is_confined(self, path: str) -> bool:
         """Check that a path stays within the allowed workspace."""

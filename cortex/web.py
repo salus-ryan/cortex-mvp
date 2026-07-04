@@ -37,6 +37,7 @@ from cortex.state_service import StateService
 from cortex.step_function import CortexStepFunction
 from cortex.tool_algebra import ToolAlgebra
 from cortex.tool_gateway import ToolGateway
+from cortex.tool_registry import ToolRegistry
 from cortex.trajectory_score import TrajectoryScorer
 from cortex.trust_boundary import TrustBoundaryService
 from cortex.witness import WitnessService
@@ -172,6 +173,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeployService(ROOT).report())
         elif self.path == "/payments/status":
             self._json(200, PaymentService(ROOT).status())
+        elif path == "/tools/report":
+            self._json(200, ToolRegistry(str(ROOT)).postcondition_coverage_report())
         elif self.path == "/foundry/repos":
             self._json(200, FoundryRegistry().repos())
         elif self.path == "/foundry/plan":

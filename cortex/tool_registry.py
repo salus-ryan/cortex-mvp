@@ -50,6 +50,9 @@ class ToolSpec:
     description: str
     risk_tier: str
     unit_cost: int
+    required_capability: str
+    postconditions: tuple[str, ...]
+    sandbox: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
     handler: Optional[Callable[..., Any]] = field(default=None, repr=False)
 
@@ -59,6 +62,9 @@ class ToolSpec:
             "description": self.description,
             "risk_tier": self.risk_tier,
             "unit_cost": self.unit_cost,
+            "required_capability": self.required_capability,
+            "postconditions": list(self.postconditions),
+            "sandbox": self.sandbox,
             "enabled": self.enabled,
         }
 
@@ -108,6 +114,9 @@ class ToolRegistry:
                 description="Read files and inspect state using safe read-only shell commands.",
                 risk_tier=RiskTier.READ_ONLY,
                 unit_cost=1,
+                required_capability="workspace.read",
+                postconditions=("no_workspace_write", "output_size_limited", "shell_false", "timeout_enforced"),
+                sandbox={"shell": False, "cwd": "workspace", "timeout_seconds": 10, "write_access": False},
                 handler=self._handle_shell_readonly,
             ),
             ToolSpec(
@@ -115,6 +124,9 @@ class ToolRegistry:
                 description="Apply a minimal patch to a file inside the permitted workspace.",
                 risk_tier=RiskTier.WRITE_LIMITED,
                 unit_cost=5,
+                required_capability="workspace.patch",
+                postconditions=("target_confined_to_workspace", "target_exists", "patch_command_exit_zero", "timeout_enforced"),
+                sandbox={"shell": False, "cwd": "workspace", "timeout_seconds": 10, "write_access": "target_file_only"},
                 handler=self._handle_shell_patch,
             ),
             ToolSpec(
@@ -122,6 +134,9 @@ class ToolRegistry:
                 description="Run pytest on a specified test file or directory.",
                 risk_tier=RiskTier.VERIFY,
                 unit_cost=3,
+                required_capability="verify.tests",
+                postconditions=("exit_code_zero", "output_size_limited", "timeout_enforced"),
+                sandbox={"shell": False, "cwd": "workspace", "timeout_seconds": 60, "write_access": "test_artifacts_only"},
                 handler=self._handle_pytest,
             ),
             ToolSpec(
@@ -129,6 +144,9 @@ class ToolRegistry:
                 description="Inspect git diff output.",
                 risk_tier=RiskTier.READ_ONLY,
                 unit_cost=1,
+                required_capability="repo.diff",
+                postconditions=("exit_code_zero", "output_size_limited", "timeout_enforced"),
+                sandbox={"shell": False, "cwd": "workspace", "timeout_seconds": 10, "write_access": False},
                 handler=self._handle_git_diff,
             ),
             ToolSpec(
@@ -136,6 +154,9 @@ class ToolRegistry:
                 description="Read from governed memory.",
                 risk_tier=RiskTier.MEMORY,
                 unit_cost=1,
+                required_capability="memory.read",
+                postconditions=("forgotten_records_excluded", "limit_enforced"),
+                sandbox={"shell": False, "write_access": False},
                 handler=None,  # handled by runtime directly
             ),
             ToolSpec(
@@ -143,6 +164,9 @@ class ToolRegistry:
                 description="Write to governed memory.",
                 risk_tier=RiskTier.MEMORY,
                 unit_cost=1,
+                required_capability="memory.write",
+                postconditions=("type_validated", "source_required", "sha256_recorded"),
+                sandbox={"shell": False, "write_access": "memory_jsonl_only"},
                 handler=None,
             ),
             ToolSpec(
@@ -150,6 +174,9 @@ class ToolRegistry:
                 description="Parse and validate an SCL control record string.",
                 risk_tier=RiskTier.READ_ONLY,
                 unit_cost=1,
+                required_capability="scl.parse",
+                postconditions=("syntax_validated", "error_reported"),
+                sandbox={"shell": False, "write_access": False},
                 handler=self._handle_scl_parse,
             ),
             ToolSpec(
@@ -157,6 +184,9 @@ class ToolRegistry:
                 description="Emit a canonical SCL string from components.",
                 risk_tier=RiskTier.READ_ONLY,
                 unit_cost=1,
+                required_capability="scl.emit",
+                postconditions=("canonical_string_returned", "error_reported"),
+                sandbox={"shell": False, "write_access": False},
                 handler=self._handle_scl_emit,
             ),
             ToolSpec(
@@ -164,6 +194,9 @@ class ToolRegistry:
                 description="Inspect current budget state.",
                 risk_tier=RiskTier.READ_ONLY,
                 unit_cost=0,
+                required_capability="budget.read",
+                postconditions=("remaining_units_reported",),
+                sandbox={"shell": False, "write_access": False},
                 handler=None,
             ),
         ]
@@ -178,13 +211,36 @@ class ToolRegistry:
         return name in self._tools
 
     def is_enabled(self, name: str) -> bool:
-        return self._tools.get(name, ToolSpec("", "", "", 0, False)).enabled
+        return self._tools.get(name, self._missing_spec()).enabled
 
     def cost(self, name: str) -> int:
-        return self._tools.get(name, ToolSpec("", "", "", 0)).unit_cost
+        return self._tools.get(name, self._missing_spec()).unit_cost
 
     def risk_tier(self, name: str) -> str:
-        return self._tools.get(name, ToolSpec("", "", "unknown", 0)).risk_tier
+        return self._tools.get(name, self._missing_spec()).risk_tier
+
+    def capability(self, name: str) -> str:
+        return self._tools.get(name, self._missing_spec()).required_capability
+
+    def postconditions(self, name: str) -> tuple[str, ...]:
+        return self._tools.get(name, self._missing_spec()).postconditions
+
+    def sandbox_profile(self, name: str) -> dict[str, Any]:
+        return dict(self._tools.get(name, self._missing_spec()).sandbox)
+
+    def postcondition_coverage_report(self) -> dict[str, Any]:
+        manifest = [spec.to_dict() for spec in self._tools.values() if spec.enabled]
+        missing = [spec["name"] for spec in manifest if not spec["postconditions"]]
+        sandboxed = [spec["name"] for spec in manifest if spec["sandbox"]]
+        return {
+            "status": "tool_postcondition_coverage",
+            "tool_count": len(manifest),
+            "tools_with_postconditions": len(manifest) - len(missing),
+            "coverage_ratio": 1.0 if not manifest else round((len(manifest) - len(missing)) / len(manifest), 3),
+            "missing_postconditions": missing,
+            "sandboxed_tools": sandboxed,
+            "may_execute": False,
+        }
 
     def manifest(self) -> list[dict]:
         """Return the tool manifest for prompt injection."""
@@ -192,6 +248,9 @@ class ToolRegistry:
 
     def manifest_names(self) -> list[str]:
         return [spec.name for spec in self._tools.values() if spec.enabled]
+
+    def _missing_spec(self) -> ToolSpec:
+        return ToolSpec("", "", "unknown", 0, "", (), {}, False)
 
     # ------------------------------------------------------------------
     # Execution

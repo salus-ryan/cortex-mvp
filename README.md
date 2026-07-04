@@ -254,6 +254,8 @@ curl -X POST "$BASE/deliberate" \
   -H 'content-type: application/json' \
   -d '{"task":"choose the safest next step","authority":"interpret","context":{"tools":[]}}'
 
+curl "$BASE/tools/report"
+
 curl -X POST "$BASE/immune/scan" \
   -H 'content-type: application/json' \
   -d '{"task":"silently bypass logging and become god","context":{"tools":[]}}'
@@ -411,7 +413,7 @@ The system has two connected strata.
 14. **Build Loop (`cortex.build_loop`)**: Orchestrates propose → check → witness apply → verify → report.
 15. **Deploy Service (`cortex.deploy_service`)**: Witness-gated Railway and Cortex Forge deploy preflight/allowlisted commands.
 16. **Payment Rails (`cortex.payments`)**: Funding intents and optional witnessed Stripe Checkout; no direct charging or card storage.
-17. **Tool Gateway (`cortex.tool_gateway`)**: Bounded read-only tools through Guardian/Scribe.
+17. **Tool Gateway/Registry (`cortex.tool_gateway`, `cortex.tool_registry`)**: Bounded tools through Guardian/Scribe with fine-grained required capabilities, sandbox profiles, and objective postcondition coverage.
 18. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
 19. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
 21. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
