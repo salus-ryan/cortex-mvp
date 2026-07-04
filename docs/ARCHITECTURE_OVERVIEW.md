@@ -64,6 +64,10 @@ Examples:
 
 The OpenAI-compatible model list remains available at `/v1/models`; the full routing manifest is available at `/models/registry`.
 
+## Concept graph
+
+Cortex can derive a small inspectable concept graph from explicit personal memories. Graph nodes cite memory record IDs, are exposed via `/relationship/graph`, and remain removable through the memory service.
+
 ## Safety layers
 
 1. **SCL parser/schema**: rejects malformed or unknown control records.

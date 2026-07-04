@@ -12,6 +12,7 @@ from typing import Any
 from cortex.auth import AuthService, PATH_CAPABILITIES
 from cortex.awareness import AwarenessService
 from cortex.build_loop import BuildLoopService
+from cortex.concept_graph import ConceptGraphService
 from cortex.deliberation import DeliberationService
 from cortex.deploy_service import DeployService
 from cortex.file_mentions import enrich_text_with_file_mentions
@@ -174,6 +175,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, FoundryRegistry().repos())
         elif self.path == "/foundry/plan":
             self._json(200, FoundryRegistry().plan())
+        elif self.path == "/relationship/graph":
+            self._json(200, ConceptGraphService(ROOT).graph())
         elif self.path == "/memory/export":
             self._json(200, MemoryService(ROOT).export())
         elif self.path == "/state/manifest":
