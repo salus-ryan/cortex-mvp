@@ -125,6 +125,18 @@ def test_web_openai_compatible(monkeypatch, tmp_path):
         server.shutdown()
 
 
+def test_web_openai_file_mentions(monkeypatch, tmp_path):
+    (tmp_path / "notes.md").write_text("agreed context", encoding="utf-8")
+    server, base = serve(monkeypatch, tmp_path)
+    try:
+        code, data = post(base + "/v1/chat/completions", {"model": "cortex-local-mind-v1", "messages": [{"role": "user", "content": "use @{notes.md}"}]})
+        assert code == 200
+        assert data["file_mentions"][0]["status"] == "included"
+        assert data["file_mentions"][0]["path"] == "notes.md"
+    finally:
+        server.shutdown()
+
+
 def test_web_self_train(monkeypatch, tmp_path):
     server, base = serve(monkeypatch, tmp_path)
     try:

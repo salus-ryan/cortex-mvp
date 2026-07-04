@@ -410,9 +410,10 @@ class SystemInvariant(Invariant):
         return InvariantResult(cls.name, True)
 
     @classmethod
-    def repair(cls) -> InvariantResult:
+    def repair(cls, result: InvariantResult, *args, **kwargs) -> InvariantResult:
         return InvariantResult(
             cls.name, False,
+            reason=result.reason,
             repair_note="System invariants cannot be auto-repaired. "
                         "Run: pip install -r requirements.txt"
         )

@@ -14,6 +14,7 @@ from cortex.awareness import AwarenessService
 from cortex.build_loop import BuildLoopService
 from cortex.deliberation import DeliberationService
 from cortex.deploy_service import DeployService
+from cortex.file_mentions import enrich_text_with_file_mentions
 from cortex.foundry import FoundryRegistry
 from cortex.immune import ImmuneService
 from cortex.init import CortexInit
@@ -268,8 +269,12 @@ class Handler(BaseHTTPRequestHandler):
             if not task:
                 self._json(400, {"status": "bad_request", "reason": "task is required"})
             else:
-                result = OracleClient(ROOT).propose(task, str(payload.get("authority", "interpret")), payload.get("context", {}))
-                scribe.append("actions.jsonl", {"actor": "web.oracle", "action_type": "oracle_proposal", "status": "proposed", "oracle": result})
+                task, file_mentions = enrich_text_with_file_mentions(ROOT, task)
+                context = dict(payload.get("context", {}) or {})
+                if file_mentions["mentions"]:
+                    context["file_mentions"] = file_mentions
+                result = OracleClient(ROOT).propose(task, str(payload.get("authority", "interpret")), context)
+                scribe.append("actions.jsonl", {"actor": "web.oracle", "action_type": "oracle_proposal", "status": "proposed", "oracle": result, "file_mentions": file_mentions.get("mentions", [])})
                 self._json(200, result)
         elif self.path == "/model/propose":
             rec = TrustBoundaryService(ROOT).record_proposal(
@@ -361,8 +366,9 @@ class Handler(BaseHTTPRequestHandler):
             remembered = rel.remember(text, witness, str(payload.get("source", "mobile_converse"))) if text else {"status": "refused", "reason": "content is required", "may_execute": False}
             profile = rel.profile()
             task = "Respond conversationally and briefly to the human. Use the relationship profile as context. Human said: " + text
-            oracle = OracleClient(ROOT).propose(task, "interpret", {"mobile": True, "relationship_profile": profile.get("summary"), "remembered": remembered.get("status")})
-            result = {"status": "conversed", "remembered": remembered, "profile": profile, "oracle": oracle, "reply": oracle.get("proposal"), "may_execute": False}
+            task, file_mentions = enrich_text_with_file_mentions(ROOT, task)
+            oracle = OracleClient(ROOT).propose(task, "interpret", {"mobile": True, "relationship_profile": profile.get("summary"), "remembered": remembered.get("status"), "file_mentions": file_mentions})
+            result = {"status": "conversed", "remembered": remembered, "profile": profile, "oracle": oracle, "reply": oracle.get("proposal"), "file_mentions": file_mentions.get("mentions", []), "may_execute": False}
             self._json(200 if remembered.get("status") == "remembered" else 400, result)
         elif self.path == "/witness":
             rec = WitnessService(ROOT).witness(str(payload.get("witness", payload.get("name", "human"))), str(payload.get("statement", "")), str(payload.get("scope", "general")), payload.get("signature"))
@@ -444,14 +450,15 @@ class Handler(BaseHTTPRequestHandler):
         model = str(payload.get("model", "cortex-local-mind-v1"))
         stream = bool(payload.get("stream", False))
         task = "\n".join(str(m.get("content", "")) for m in messages if m.get("role") in {"user", "developer", "system"}).strip()
+        task, file_mentions = enrich_text_with_file_mentions(ROOT, task)
         if not task:
             self._json(400, {"error": {"message": "messages are required", "type": "bad_request"}})
             return
         if model == "cortex-deliberative-v1":
-            deliberation = DeliberationService(ROOT).deliberate(task, "interpret", {"openai_compatible": True})
+            deliberation = DeliberationService(ROOT).deliberate(task, "interpret", {"openai_compatible": True, "file_mentions": file_mentions})
             content = json.dumps({"recommendation": deliberation.get("recommendation"), "risk": deliberation.get("risk"), "may_execute": False}, indent=2, sort_keys=True)
         else:
-            result = OracleClient(ROOT).propose(task, "interpret", {"openai_compatible": True, "messages": messages[-8:]})
+            result = OracleClient(ROOT).propose(task, "interpret", {"openai_compatible": True, "messages": messages[-8:], "file_mentions": file_mentions})
             content = str(result.get("proposal", ""))
         scribe.append("actions.jsonl", {"actor": "web.openai", "action_type": "chat_completion", "status": "proposed", "model": model, "may_execute": False})
         if stream:
@@ -464,6 +471,7 @@ class Handler(BaseHTTPRequestHandler):
             "model": model,
             "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            "file_mentions": file_mentions.get("mentions", []),
         })
 
     def _invoke_ipc(self, payload: dict[str, Any], scribe: ScribeClient) -> dict[str, Any]:
@@ -490,7 +498,8 @@ class Handler(BaseHTTPRequestHandler):
             scribe.append("actions.jsonl", {**base, "action_type": "refuse", "status": "refused"})
             return {"status": "refused", "reason": guardian.get("reason"), "law": guardian.get("law", []), "anti_idolatry": ANTI_IDOLATRY, "record": refusal}
         record = scribe.append("actions.jsonl", {**base, "action_type": "invoke", "status": "accepted"})
-        oracle = OracleClient(ROOT).propose(task, authority, {"tools": tools, "witness": witness})
+        task, file_mentions = enrich_text_with_file_mentions(ROOT, task)
+        oracle = OracleClient(ROOT).propose(task, authority, {"tools": tools, "witness": witness, "file_mentions": file_mentions})
         oracle_record = scribe.append("actions.jsonl", {**base, "action_type": "oracle_proposal", "status": "proposed", "oracle": oracle})
         return {
             "status": "accepted",
@@ -499,6 +508,7 @@ class Handler(BaseHTTPRequestHandler):
             "guardian": guardian.get("reason"),
             "oracle": oracle,
             "response": oracle.get("proposal", ""),
+            "file_mentions": file_mentions.get("mentions", []),
             "anti_idolatry": ANTI_IDOLATRY,
             "record": record,
             "oracle_record": oracle_record,

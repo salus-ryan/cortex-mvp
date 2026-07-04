@@ -37,6 +37,7 @@ class OAuthService:
             "provider": "generic_oidc_pkce",
             "issuer": self.issuer(),
             "client_id_configured": bool(self.client_id()),
+            "client_secret_configured": bool(self.client_secret()),
             "redirect_uri": self.redirect_uri(),
             "scopes": self.scopes(),
             "allowed_subjects_configured": bool(self.allowed_subjects()),
@@ -95,13 +96,16 @@ class OAuthService:
         endpoint = self.endpoints().get("token_endpoint")
         if not endpoint:
             return {"status": "refused", "reason": "token_endpoint_missing", "may_execute": False}
-        body = urllib.parse.urlencode({
+        fields = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": self.redirect_uri(),
             "client_id": self.client_id(),
             "code_verifier": verifier,
-        }).encode()
+        }
+        if self.client_secret():
+            fields["client_secret"] = self.client_secret()
+        body = urllib.parse.urlencode(fields).encode()
         req = urllib.request.Request(endpoint, data=body, headers={"content-type": "application/x-www-form-urlencoded"}, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
@@ -267,6 +271,9 @@ class OAuthService:
 
     def redirect_uri(self) -> str:
         return os.environ.get("CORTEX_OIDC_REDIRECT_URI", "")
+
+    def client_secret(self) -> str:
+        return os.environ.get("CORTEX_OIDC_CLIENT_SECRET", "")
 
     def scopes(self) -> str:
         return os.environ.get("CORTEX_OIDC_SCOPES", "openid profile email")

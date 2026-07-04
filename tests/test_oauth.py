@@ -13,6 +13,17 @@ def test_oauth_status_unconfigured(tmp_path: Path, monkeypatch):
     assert status["may_execute"] is False
 
 
+def test_oauth_status_reports_confidential_client_presence_without_value(tmp_path: Path, monkeypatch):
+    marker = "confidential-marker"
+    monkeypatch.setenv("CORTEX_OIDC_CLIENT_ID", "client-1")
+    monkeypatch.setenv("CORTEX_OIDC_CLIENT_SECRET", marker)
+    monkeypatch.setenv("CORTEX_OIDC_REDIRECT_URI", "https://cortex.example/oauth/callback")
+    monkeypatch.setenv("CORTEX_OIDC_AUTHORIZATION_ENDPOINT", "https://issuer.example/authorize")
+    status = OAuthService(tmp_path).status()
+    assert status["client_secret_configured"] is True
+    assert marker not in str(status)
+
+
 def test_oauth_login_builds_pkce_url_and_records_state(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CORTEX_OIDC_CLIENT_ID", "client-1")
     monkeypatch.setenv("CORTEX_OIDC_REDIRECT_URI", "https://cortex.example/oauth/callback")

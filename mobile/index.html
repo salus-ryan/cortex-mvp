@@ -42,7 +42,7 @@
   </section>
 
   <section id="chat" class="view hide fade">
-    <div class="card"><h2>Get to know Cortex</h2><div class="muted">Send once. Cortex replies and learns as witnessed personal memory when auth is saved. Learning is visible and auditable.</div><textarea id="prompt" placeholder="Tell Cortex who you are, what you care about, or ask her something"></textarea><div class="row"><button class="primary" onclick="converse()">Send</button></div><pre id="chatout" class="output">Conversation appears here.</pre></div>
+    <div class="card"><h2>Get to know Cortex</h2><div class="muted">Send once. Cortex replies and learns as witnessed personal memory when auth is saved. Learning is visible and auditable.</div><textarea id="prompt" placeholder="Tell Cortex who you are, ask something, or add @{LAW.md} to include a specific workspace file"></textarea><div class="row"><button class="primary" onclick="converse()">Send</button></div><pre id="chatout" class="output">Conversation appears here.</pre></div>
     <div class="card"><h2>What Cortex knows about you</h2><div class="row"><button onclick="profile()">Refresh profile</button><button onclick="exportMemory()">Export</button></div><input id="forgetid" placeholder="memory id to forget"/><button class="danger" onclick="forgetSelected()">Forget selected memory</button><pre id="profileout" class="output">No profile loaded.</pre></div>
   </section>
 
