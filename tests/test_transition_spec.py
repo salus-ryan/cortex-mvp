@@ -2,13 +2,17 @@ from cortex.budget import Budget, BudgetExhaustedError
 from cortex.runtime import CortexRuntime
 from cortex.scl_parser import SCLAction
 from cortex.tool_registry import ExecutionResult
-from cortex.transition_spec import TRANSITIONS, all_scl_pairs, check_postconditions, missing_transition_pairs
+from cortex.transition_spec import TRANSITIONS, all_scl_pairs, audit_required_pairs, check_postconditions, missing_transition_pairs
 from cortex.verifier import VerifyResult, _action_cost
 
 
 def test_transition_spec_is_total_for_scl_pairs():
     assert missing_transition_pairs() == set()
     assert set(TRANSITIONS) == all_scl_pairs()
+
+
+def test_all_scl_pairs_require_audit_by_default():
+    assert audit_required_pairs() == all_scl_pairs()
 
 
 def test_non_tool_action_costs_are_non_negative_for_all_pairs():

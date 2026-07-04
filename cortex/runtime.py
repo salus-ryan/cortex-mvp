@@ -45,6 +45,7 @@ from cortex.rollback import RollbackManager
 from cortex.scl_parser import SCLAction, parse as scl_parse
 from cortex.tool_registry import ExecutionResult, ToolRegistry
 from cortex.trajectory_logger import StepRecord, TrajectoryLogger
+from cortex.transition_spec import check_postconditions, transition_for
 from cortex.verifier import Verifier
 from cortex.scl_emitter import SCLEmitter
 from cortex.health import HealthMonitor
@@ -380,12 +381,21 @@ class CortexRuntime:
             rollback.record_if_needed(action, execution_result, step=step)
 
             # --- State transition ---
+            before_state = state
             state = self._transition_state(state, action, execution_result, verify_post)
+            post_ok, post_reason = check_postconditions(before_state, state, action.anchor, action.relation)
+            if not post_ok:
+                self._audit(task.task_id, step, "transition", action.raw, "failed", "postcondition_failed", {"reason": post_reason})
+                observation = f"transition_postcondition_failed: {post_reason}"
+                memory.audit_log("postcondition_failed", step, {"reason": post_reason})
+                self.logger.denied(task.task_id, record, post_reason, "denied_verify")
+                continue
 
             # --- Log step ---
             self.logger.accepted(task.task_id, record, execution_result, verify_post)
             memory.audit_log("accepted", step, {"action": action.raw, "cost": cost})
-            self._audit(task.task_id, step, "runtime", action.raw, "accepted", "action_accepted", {"cost": cost, "tool": execution_result.tool, "success": execution_result.success})
+            transition = transition_for(action.anchor, action.relation)
+            self._audit(task.task_id, step, "runtime", action.raw, "accepted", "action_accepted", {"cost": cost, "tool": execution_result.tool, "success": execution_result.success, "transition_phase": transition.phase, "terminal": transition.terminal})
 
             # --- Persist to SQLite ---
             if self._store is not None:

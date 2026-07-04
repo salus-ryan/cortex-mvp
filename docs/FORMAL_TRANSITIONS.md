@@ -19,11 +19,14 @@ python -m pytest tests/test_transition_spec.py -q
 Current postcondition checks cover:
 
 - transition table totality
+- all SCL pairs require audit evidence by default
 - non-negative action costs
 - monotonic budget debits
 - overspend refusal without unit mutation
 - repair patch/rollback phase constraints
 - tool provenance reference consistency
+- runtime postcondition failures are audited and refused
+- accepted runtime audit events include transition metadata
 
 Roadmap:
 

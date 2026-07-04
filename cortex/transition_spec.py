@@ -59,6 +59,11 @@ def transition_for(anchor: str, relation: str) -> TransitionSpec:
     return TRANSITIONS[(anchor, relation)]
 
 
+def audit_required_pairs() -> set[tuple[str, str]]:
+    """Return all transition pairs that must emit audit evidence."""
+    return {pair for pair, spec in TRANSITIONS.items() if spec.requires_audit}
+
+
 def check_postconditions(before: dict[str, Any], after: dict[str, Any], anchor: str, relation: str) -> tuple[bool, str]:
     """Check minimal postconditions for a runtime state transition.
 
