@@ -13,7 +13,8 @@ def test_readonly_tool_does_not_invoke_shell_control_operators(tmp_path: Path):
 
     result = reg.execute("shell.readonly", args=f"echo ok; touch {marker}")
 
-    assert result.success
+    assert not result.success
+    assert "control syntax" in result.error
     assert not marker.exists()
 
 

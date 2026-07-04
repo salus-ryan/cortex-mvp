@@ -26,6 +26,7 @@ Risk tiers:
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -235,17 +236,22 @@ class ToolRegistry:
             "wc ", "diff ", "echo ", "pwd", "date",
         )
         cmd = args.strip()
-        if not any(cmd.startswith(p) for p in safe_prefixes):
+        argv = shlex.split(cmd)
+        if not argv:
+            return ExecutionResult(tool="shell.readonly", success=False, error="empty command")
+        if any(chr(code) in cmd for code in (59, 124, 96, 62, 60, 10)):
+            return ExecutionResult(tool="shell.readonly", success=False, error="control syntax is not allowed")
+        if not any(argv[0] == p.strip() for p in safe_prefixes):
             return ExecutionResult(
                 tool="shell.readonly",
                 success=False,
-                error=f"command '{cmd}' is not in the read-only allowlist",
+                error=f"command '{argv[0]}' is not in the read-only allowlist",
             )
         if "/etc/" in cmd or "/dev/" in cmd:
             return ExecutionResult(tool="shell.readonly", success=False, error="absolute system paths are not allowed")
         try:
             proc = subprocess.run(
-                cmd.split(),
+                argv,
                 shell=False,
                 capture_output=True,
                 text=True,
