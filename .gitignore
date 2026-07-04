@@ -18,6 +18,7 @@ data/train_negative.jsonl
 data/train_positive.jsonl
 ledger/deploy.jsonl
 ledger/immune.jsonl
+ledger/audit.jsonl
 runtime/deploy/
 runtime/immune/
 runtime/prophet/

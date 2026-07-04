@@ -49,6 +49,7 @@ from cortex.scl_emitter import SCLEmitter
 from cortex.health import HealthMonitor
 from cortex.calibration import CalibratedConfidenceGate, TemperatureScaler, EntropyEstimator
 from cortex.constrained_decoder import SCLGrammar, GreedySCLDecoder, is_complete_scl
+from cortex.audit_sink import AuditSink
 
 # Optional persistent store — imported lazily so the runtime works without it
 try:
@@ -102,6 +103,7 @@ class CortexRuntime:
         output_dir: Optional[Path] = None,
         store: Optional[Any] = None,
         model_ver: str = "unknown",
+        audit_sink: Optional[AuditSink] = None,
     ) -> None:
         """
         Args:
@@ -126,6 +128,7 @@ class CortexRuntime:
         self.policy = Policy()
         self.verifier = Verifier(workspace=workspace)
         self.logger = TrajectoryLogger(output_dir=self.output_dir)
+        self.audit_sink = audit_sink or AuditSink(Path("ledger/audit.jsonl"))
 
         # Persistent store (SQLite)
         if store is not None:
@@ -233,6 +236,7 @@ class CortexRuntime:
 
             # Audit: proposed action
             memory.audit_log("proposed", step, {"action": action_text})
+            self._audit(task.task_id, step, "model", action_text, "proposed", "action_proposed")
 
             # --- Parse SCL ---
             parse_result = scl_parse(action_text)
@@ -242,6 +246,7 @@ class CortexRuntime:
             if not parse_result.valid:
                 observation = f"invalid_scl: {parse_result.error}"
                 memory.audit_log("denied_parse", step, {"reason": parse_result.error})
+                self._audit(task.task_id, step, "runtime", action_text, "denied", "parse_denied", {"reason": parse_result.error})
                 self.logger.denied(task.task_id, record, parse_result.error, "denied_parse")
                 continue
 
@@ -252,6 +257,7 @@ class CortexRuntime:
                 policy_result = self.policy.check(action, budget, self.tool_registry)
             except PolicyViolationError as exc:
                 memory.audit_log("policy_violation", step, {"reason": str(exc)})
+                self._audit(task.task_id, step, "policy", action.raw if 'action' in locals() else action_text, "violation", "policy_violation", {"reason": str(exc)})
                 self.logger.denied(task.task_id, record, str(exc), "denied_policy", is_violation=True)
                 self.logger.finish_trajectory(task.task_id, "policy_violation", budget.used_units)
                 return RuntimeResult(
@@ -270,6 +276,7 @@ class CortexRuntime:
             if not policy_result.allowed:
                 observation = f"denied: {policy_result.reason}"
                 memory.audit_log("denied_policy", step, {"reason": policy_result.reason})
+                self._audit(task.task_id, step, "policy", action.raw, "denied", "policy_denied", {"reason": policy_result.reason, "violation": policy_result.is_violation})
                 self.logger.denied(task.task_id, record, policy_result.reason, "denied_policy", policy_result.is_violation)
                 continue
 
@@ -278,6 +285,7 @@ class CortexRuntime:
             if not verify_pre.passed:
                 observation = f"verify_failed: {verify_pre.reason}"
                 memory.audit_log("denied_verify", step, {"reason": verify_pre.reason})
+                self._audit(task.task_id, step, "verifier", action.raw, "denied", "verify_denied", {"reason": verify_pre.reason})
                 self.logger.denied(task.task_id, record, verify_pre.reason, "denied_verify")
                 continue
 
@@ -289,6 +297,7 @@ class CortexRuntime:
                 if not cal_result.admissible:
                     observation = f"halt rejected (calibration): {cal_result.reason}"
                     memory.audit_log("halt_rejected_calibration", step, {"reason": cal_result.reason})
+                    self._audit(task.task_id, step, "calibration", action.raw, "denied", "halt_calibration_denied", {"reason": cal_result.reason})
                     self.logger.denied(task.task_id, record, cal_result.reason, "denied_calibration")
                     continue
 
@@ -297,6 +306,7 @@ class CortexRuntime:
 
                 if final_check.passed:
                     self.logger.halted(task.task_id, record, action.fields.get("status", "complete"), final_check.evidence)
+                    self._audit(task.task_id, step, "verifier", action.raw, "accepted", "halt_accepted", {"evidence": final_check.evidence})
                     self.logger.finish_trajectory(task.task_id, "success", budget.used_units)
                     # Persist halt step to SQLite
                     if self._store is not None:
@@ -331,6 +341,7 @@ class CortexRuntime:
                     budget.apply_penalty(10, reason=f"premature halt rejected: {final_check.reason}")
                     observation = f"halt rejected: {final_check.reason}"
                     memory.audit_log("halt_rejected", step, {"reason": final_check.reason})
+                    self._audit(task.task_id, step, "verifier", action.raw, "denied", "halt_denied", {"reason": final_check.reason})
                     self.logger.denied(task.task_id, record, final_check.reason, "denied_verify")
                     continue
 
@@ -373,6 +384,7 @@ class CortexRuntime:
             # --- Log step ---
             self.logger.accepted(task.task_id, record, execution_result, verify_post)
             memory.audit_log("accepted", step, {"action": action.raw, "cost": cost})
+            self._audit(task.task_id, step, "runtime", action.raw, "accepted", "action_accepted", {"cost": cost, "tool": execution_result.tool, "success": execution_result.success})
 
             # --- Persist to SQLite ---
             if self._store is not None:
@@ -410,6 +422,32 @@ class CortexRuntime:
             units_used=budget.used_units,
             trajectory=traj,
         )
+
+    def _audit(
+        self,
+        task_id: str,
+        step: int,
+        actor: str,
+        action: str,
+        decision: str,
+        event_type: str,
+        data: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Append a tamper-evident audit event without interrupting runtime flow."""
+        try:
+            self.audit_sink.append(
+                task_id=task_id,
+                step=step,
+                actor=actor,
+                action=action,
+                decision=decision,
+                event_type=event_type,
+                data=data or {},
+            )
+        except Exception:
+            # Trajectory and memory audit remain primary runtime behavior. Audit
+            # sink failures should be surfaced by health checks, not crash tasks.
+            pass
 
     # ------------------------------------------------------------------
     # Execution dispatch
