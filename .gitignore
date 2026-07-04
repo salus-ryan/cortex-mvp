@@ -25,4 +25,5 @@ ledger/audit.jsonl
 runtime/deploy/
 runtime/immune/
 runtime/prophet/
+runtime/cognition/
 .pytest_cache/

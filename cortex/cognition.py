@@ -33,13 +33,26 @@ class CapabilityProbe:
         return bool(self.evidence)
 
     def score(self) -> int:
-        return self.weight if self.present else 0
+        """Score partial capability evidence instead of granting full credit.
+
+        This keeps the AGI-ish map honest: existing files are evidence of a
+        scaffold, while unresolved gaps reduce the score until they have direct
+        implementation/evaluation evidence.
+        """
+        denominator = len(self.evidence) + len(self.gaps)
+        if denominator == 0:
+            return 0
+        return round(self.weight * (len(self.evidence) / denominator))
+
+    def deficit(self) -> int:
+        return max(self.weight - self.score(), 0)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "weight": self.weight,
             "score": self.score(),
+            "deficit": self.deficit(),
             "present": self.present,
             "evidence": self.evidence,
             "gaps": self.gaps,
@@ -77,6 +90,7 @@ class CognitionKernel:
             },
             "capabilities": [p.to_dict() for p in probes],
             "largest_gaps": self._largest_gaps(probes),
+            "min_max": self.min_max(probes),
             "next_recommended_goal": self.choose_goal(probes),
             "safety_boundary": {
                 "model_role": "proposer_only",
@@ -132,10 +146,35 @@ class CognitionKernel:
 
     def choose_goal(self, probes: list[CapabilityProbe] | None = None) -> str:
         probes = probes or self._capability_probes()
-        gaps = self._largest_gaps(probes)
+        plan = self.min_max(probes)
+        gaps = plan["minimize"]
         if not gaps:
             return "Run a governed self-evaluation and identify the next measurable Cortex capability improvement."
-        return f"Reduce the largest Cortex AGI-ish capability gap: {gaps[0]}"
+        return f"Minimize the largest Cortex AGI-ish gap and maximize verified capability: {gaps[0]}"
+
+    def min_max(self, probes: list[CapabilityProbe] | None = None) -> dict[str, Any]:
+        """Return the safest minimax path toward stronger general capability.
+
+        Minimize the highest weighted unresolved gaps; maximize capabilities
+        that already have evidence and can be improved with tests/provenance.
+        This is a roadmap only: it does not assert AGI and cannot execute.
+        """
+        probes = probes or self._capability_probes()
+        by_deficit = sorted(probes, key=lambda p: (p.deficit(), p.weight), reverse=True)
+        by_score = sorted(probes, key=lambda p: (p.score(), p.weight), reverse=True)
+        minimize = [f"{p.name}: {gap}" for p in by_deficit if p.deficit() for gap in p.gaps][:5]
+        maximize = [
+            {"capability": p.name, "current_score": p.score(), "possible": p.weight, "evidence": p.evidence[:3]}
+            for p in by_score
+            if p.present
+        ][:5]
+        return {
+            "objective": "minimize unresolved capability/safety gaps; maximize verified, test-backed generality",
+            "minimize": minimize,
+            "maximize": maximize,
+            "guardrail": "proposal-only; material changes still require authority, witnesses, verifier gates, and ledger evidence",
+            "may_execute": False,
+        }
 
     def latest(self) -> dict[str, Any]:
         path = self.runtime / "latest.json"
@@ -223,10 +262,9 @@ class CognitionKernel:
         return counts
 
     def _largest_gaps(self, probes: list[CapabilityProbe]) -> list[str]:
-        missing = sorted((p for p in probes if not p.present), key=lambda p: p.weight, reverse=True)
-        partial = sorted((p for p in probes if p.present), key=lambda p: p.weight, reverse=True)
+        ranked = sorted(probes, key=lambda p: (p.deficit(), p.weight), reverse=True)
         gaps: list[str] = []
-        for probe in missing + partial:
+        for probe in ranked:
             for gap in probe.gaps:
                 gaps.append(f"{probe.name}: {gap}")
         return gaps[:8]

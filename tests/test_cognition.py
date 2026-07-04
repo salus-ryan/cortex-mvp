@@ -40,7 +40,11 @@ def test_cognition_status_scores_capabilities(tmp_path: Path):
     assert status["claim"].startswith("AGI-ish engineering scaffold")
     assert status["may_execute"] is False
     assert status["agi_ish_score"]["score"] > 0
+    assert status["agi_ish_score"]["score"] < 100
     assert status["agi_ish_score"]["possible"] == 100
+    assert status["min_max"]["may_execute"] is False
+    assert status["min_max"]["minimize"]
+    assert status["min_max"]["maximize"]
     assert status["next_recommended_goal"]
     assert (tmp_path / "runtime" / "cognition" / "status.json").exists()
 
@@ -63,7 +67,7 @@ def test_cognition_tick_bounds_empty_goal(tmp_path: Path):
     result = CognitionKernel(tmp_path).tick("")
 
     assert result["status"] == "cognition_tick"
-    assert result["selected_goal"].startswith("Reduce the largest Cortex AGI-ish capability gap") or result[
+    assert result["selected_goal"].startswith("Minimize the largest Cortex AGI-ish gap") or result[
         "selected_goal"
     ].startswith("Run a governed self-evaluation")
     assert result["may_execute"] is False
