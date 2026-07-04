@@ -180,6 +180,14 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, ConceptGraphService(ROOT).graph())
         elif self.path == "/memory/export":
             self._json(200, MemoryService(ROOT).export())
+        elif path == "/memory/report":
+            self._json(200, MemoryService(ROOT).report())
+        elif path == "/memory/search":
+            self._json(200, MemoryService(ROOT).search(
+                query=(query.get("q") or query.get("query") or [""])[0],
+                typ=(query.get("type") or [None])[0],
+                limit=int((query.get("limit") or [20])[0]),
+            ))
         elif self.path == "/state/manifest":
             self._json(200, StateService(ROOT).manifest())
         elif self.path == "/state/export":

@@ -231,6 +231,8 @@ curl -X POST "$BASE/witness" \
 curl -X POST "$BASE/memory/write" \
   -H 'content-type: application/json' \
   -d '{"type":"factual","content":"Cortex runs as PID 1","source":"human witness"}'
+curl "$BASE/memory/report"
+curl "$BASE/memory/search?q=Cortex&type=factual"
 
 curl -X POST "$BASE/planner/reflect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/planner/choose-next" -H 'content-type: application/json' -d '{}'
@@ -397,7 +399,7 @@ The system has two connected strata.
 3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
 4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
 5. **Prophet (`cortex.prophet`)**: Deterministic drift, law, PID-1, guardian refusal, oracle boundary, and ledger checks.
-6. **Memory (`cortex.memory_service`)**: Typed, sourced JSONL memory with personal-memory witness requirements.
+6. **Memory (`cortex.memory_service`)**: Typed, sourced JSONL memory with personal-memory witness requirements, quality scoring, duplicate detection, and ranked search/report endpoints.
 7. **Witness (`cortex.witness`)**: Human attestation and governance primitives.
 8. **Planner (`cortex.planner`)**: Self-organization backlog and next-action choice; may choose but not execute.
 9. **Deliberation (`cortex.deliberation`)**: Local multi-step reasoning loop: evidence, specialists, Guardian, Prophet, scored recommendations; never executes.

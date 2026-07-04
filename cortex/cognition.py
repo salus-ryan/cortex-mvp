@@ -195,8 +195,16 @@ class CognitionKernel:
             CapabilityProbe(
                 "memory",
                 15,
-                self._existing(files, ["cortex/memory_service.py", "cortex/memory.py", "cortex/concept_graph.py"]),
-                ["long-horizon episodic recall", "memory quality scoring", "human-editable forgetting UX"],
+                self._existing(files, ["cortex/memory_service.py", "cortex/memory.py", "cortex/concept_graph.py"])
+                + self._code_evidence(
+                    "cortex/memory_service.py",
+                    {
+                        "memory quality scoring": "def score_record",
+                        "memory quality report": "def report",
+                        "ranked memory search": "def search",
+                    },
+                ),
+                ["long-horizon episodic recall", "human-editable forgetting UX"],
             ),
             CapabilityProbe(
                 "planning",
@@ -251,6 +259,16 @@ class CognitionKernel:
 
     def _existing(self, files: set[str], paths: list[str]) -> list[str]:
         return [path for path in paths if path in files]
+
+    def _code_evidence(self, rel_path: str, markers: dict[str, str]) -> list[str]:
+        path = self.root / rel_path
+        if not path.exists():
+            return []
+        try:
+            text = path.read_text()
+        except UnicodeDecodeError:
+            return []
+        return [name for name, marker in markers.items() if marker in text]
 
     def _ledger_counts(self) -> dict[str, int]:
         counts = {}
