@@ -11,6 +11,7 @@ New users should start here:
 ```text
 docs/QUICKSTART.md
 docs/ADOPTERS.md
+docs/ARCHITECTURE_OVERVIEW.md
 ```
 
 Fast path:

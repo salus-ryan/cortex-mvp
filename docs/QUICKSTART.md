@@ -90,6 +90,16 @@ print(AuditSink('ledger/audit.jsonl').verify())
 
 See `docs/soc2/audit_sink.md` and `docs/soc2/README.md`.
 
+## Optional: Pi + local Ornith launcher
+
+Termux/Android users with `llama.cpp`, a local Ornith GGUF, and Pi installed can start the local model/Pi workflow with:
+
+```bash
+./start-pi-ornith-local.sh
+```
+
+The script is optional and environment-specific. Configure paths with `ORNITH_MODEL_PATH` and `LLAMA_SERVER` if your files live elsewhere.
+
 ## What Cortex is good for today
 
 - Safe developer-agent experiments.
