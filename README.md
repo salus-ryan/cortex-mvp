@@ -12,6 +12,7 @@ New users should start here:
 docs/QUICKSTART.md
 docs/ADOPTERS.md
 docs/ARCHITECTURE_OVERVIEW.md
+docs/FORMAL_CORE.md
 ```
 
 Fast path:
