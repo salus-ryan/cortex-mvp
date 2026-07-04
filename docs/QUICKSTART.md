@@ -38,6 +38,12 @@ curl http://127.0.0.1:8000/foundry/repos
 curl http://127.0.0.1:8000/oauth/status
 ```
 
+Or run the smoke script from another shell:
+
+```bash
+python scripts/smoke_local.py http://127.0.0.1:8000
+```
+
 ## 4. Try the OpenAI-compatible endpoint
 
 ```bash
