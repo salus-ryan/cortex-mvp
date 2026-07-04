@@ -31,6 +31,7 @@ Runtime loop:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from dataclasses import dataclass, field
@@ -637,17 +638,32 @@ class CortexRuntime:
 
         elif action.anchor == "@verify" and action.relation == "run":
             if verify_result.passed:
+                summary = str(getattr(execution_result, "summary", ""))[:500]
+                prov = self._provenance(action, execution_result, "verify")
                 new_state["last_verify"] = "passed"
-                new_state["verified_evidence"] = str(getattr(execution_result, "summary", ""))[:500]
+                new_state["verified_evidence"] = summary
+                new_state["latest_evidence_ref"] = prov["id"]
+                new_state.setdefault("evidence_provenance", {})[prov["id"]] = prov
             else:
                 new_state["last_verify"] = "failed"
                 new_state["last_error"] = verify_result.reason
 
         elif action.anchor == "@tool" and execution_result.success:
+            summary = str(getattr(execution_result, "summary", ""))[:500]
+            prov = self._provenance(action, execution_result, "tool")
             new_state["last_tool"] = action.fields.get("name", "")
-            new_state["verified_evidence"] = str(getattr(execution_result, "summary", ""))[:500]
+            new_state["verified_evidence"] = summary
+            new_state["latest_evidence_ref"] = prov["id"]
+            new_state.setdefault("evidence_provenance", {})[prov["id"]] = prov
 
         return new_state
+
+    def _provenance(self, action: SCLAction, execution_result: ExecutionResult, kind: str) -> dict[str, Any]:
+        """Create a stable provenance record for verified/tool evidence."""
+        summary = str(getattr(execution_result, "summary", ""))[:500]
+        material = json.dumps({"action": action.raw, "kind": kind, "tool": execution_result.tool, "summary": summary}, sort_keys=True)
+        ref = "prov_" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:12]
+        return {"id": ref, "kind": kind, "tool": execution_result.tool, "action": action.raw, "summary": summary}
 
     # ------------------------------------------------------------------
     # Prompt builder

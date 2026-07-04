@@ -306,12 +306,20 @@ class Verifier:
                 reason="halt requires non-empty evidence field citing verifier or tool output",
             )
 
+        provenance = state.get("evidence_provenance") if isinstance(state.get("evidence_provenance"), dict) else {}
+        evidence_ref = action.fields.get("evidence_ref", "")
+        if evidence_ref:
+            if evidence_ref not in provenance:
+                return FinalCheckResult(
+                    passed=False,
+                    reason=f"halt evidence_ref '{evidence_ref}' is not in current task provenance",
+                )
+            return FinalCheckResult(passed=True, reason="halt accepted", evidence=evidence)
+
         verified_evidence = str(state.get("verified_evidence", ""))
         last_verify = state.get("last_verify")
-        # When runtime state contains verified evidence, require the halt evidence
-        # to be linked to it rather than allowing an unrelated claim. Direct unit
-        # tests may call final_check with an empty state; that remains a schema-
-        # level check only.
+        # Backward-compatible fallback: when no explicit evidence_ref is supplied,
+        # require text evidence to link to the latest verified observation.
         if verified_evidence and last_verify == "passed":
             ev_l = evidence.lower()
             ve_l = verified_evidence.lower()
