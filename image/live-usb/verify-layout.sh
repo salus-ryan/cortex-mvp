@@ -25,7 +25,7 @@ if command -v python3 >/dev/null 2>&1; then
 from cortex.pid1 import child_specs_for_profile
 from cortex.scl_parser import parse
 assert child_specs_for_profile('compact')
-assert parse('@halt → answer [status: "complete", confidence: 1.0]').ok
+assert parse('@halt → answer [status: "complete", confidence: 1.0, evidence: "layout verified"]').valid
 print('cortex live layout verified')
 PY
   )
