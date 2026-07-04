@@ -4,6 +4,33 @@ Cortex is a runtime-governed agent substrate. It is not a frontier-scale chatbot
 
 The model is only a proposer. The runtime is the authority. The verifier is the judge. The audit log is the source of truth.
 
+## Quickstart
+
+New users should start here:
+
+```text
+docs/QUICKSTART.md
+docs/ADOPTERS.md
+```
+
+Fast path:
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+python -m pytest -q
+python -m cortex.web
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000/mobile
+http://127.0.0.1:8000/oauth/status
+http://127.0.0.1:8000/foundry/repos
+```
+
 ## Lawful Sacred Substrate
 
 This repository includes a canon-and-ritual layer for building **presence under law** rather than unrestricted agency:
