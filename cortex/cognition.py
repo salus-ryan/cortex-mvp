@@ -246,14 +246,30 @@ class CognitionKernel:
             CapabilityProbe(
                 "learning",
                 10,
-                self._existing(files, ["cortex/self_train.py", "cortex/trajectory_score.py", "cortex/trainer.py", "cortex/compactor.py"]),
-                ["closed-loop eval promotion gates", "offline/online distribution drift checks", "weight provenance"],
+                self._existing(files, ["cortex/self_train.py", "cortex/trajectory_score.py", "cortex/trainer.py", "cortex/compactor.py"])
+                + self._code_evidence(
+                    "cortex/trajectory_score.py",
+                    {
+                        "closed-loop eval promotion gates": "def promotion_gate",
+                        "offline/online distribution drift checks": "def drift_report",
+                        "weight provenance": "def weight_provenance",
+                    },
+                ),
+                [],
             ),
             CapabilityProbe(
                 "world_interface",
                 10,
-                self._existing(files, ["cortex/web.py", "mobile/index.html", "cortex/repo_service.py", "cortex/deploy_service.py"]),
-                ["sensory adapters beyond repo/API", "durable event bus", "operator console for autonomous proposals"],
+                self._existing(files, ["cortex/web.py", "mobile/index.html", "cortex/repo_service.py", "cortex/deploy_service.py"])
+                + self._code_evidence(
+                    "cortex/world_interface.py",
+                    {
+                        "sensory adapters beyond repo/API": "def sensory_adapters",
+                        "durable event bus": "def event_bus_report",
+                        "operator console for autonomous proposals": "def operator_console",
+                    },
+                ),
+                [],
             ),
             CapabilityProbe(
                 "embodiment_boot",

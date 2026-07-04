@@ -180,7 +180,7 @@ curl "$BASE/ledger/model-proposals.jsonl"
 curl "$BASE/ledger/next-steps.jsonl"
 ```
 
-`/model/propose` records external model output as an `untrusted_suggestion`, runs immune scanning, writes `ledger/model-proposals.jsonl`, and always returns `may_execute: false`. `/model/next-step` validates a proposal/action pairing and returns the next lawful checkpoint requirements without executing. `/step` runs one governed cycle: observe, propose, immune-scan, record proposal, compute next checkpoint when applicable, write project memory, log `ledger/steps.jsonl`, and stop with `may_execute: false`. `/loop` chains bounded `/step` cycles with stop conditions for max steps, immune escalation, repeated goals, lack of useful next goal, or human-confirmation requirements; it logs `ledger/loops.jsonl` and also returns `may_execute: false`. `/cognition/status` exposes an AGI-ish engineering capability map—not an AGI or consciousness claim—and `/cognition/tick` runs one bounded meta-cognitive cycle: assess gaps, choose/accept a goal, run one proposal-only governed step, remember evidence, and log `ledger/cognition.jsonl`, always with `may_execute: false`. `/learning/score` scores step/loop trajectories, `/learning/export-sft` exports usable traces to `data/self_train/trajectory_sft.jsonl`, and `/learning/package` writes `data/self_train/package_manifest.json` with provenance hashes; learning outputs prepare data only and cannot promote model weights. Material actions must still pass auth, signed intent, Guardian, witness, and ledger gates. If `CORTEX_REQUIRE_PROPOSAL_IDS=1`, material endpoints such as `/memory/write`, `/tool/execute`, `/patch/apply`, `/build/apply`, deploy, checkout, quarantine, self-training, and state import reject requests that do not include a matching `proposal_id`.
+`/model/propose` records external model output as an `untrusted_suggestion`, runs immune scanning, writes `ledger/model-proposals.jsonl`, and always returns `may_execute: false`. `/model/next-step` validates a proposal/action pairing and returns the next lawful checkpoint requirements without executing. `/step` runs one governed cycle: observe, propose, immune-scan, record proposal, compute next checkpoint when applicable, write project memory, log `ledger/steps.jsonl`, and stop with `may_execute: false`. `/loop` chains bounded `/step` cycles with stop conditions for max steps, immune escalation, repeated goals, lack of useful next goal, or human-confirmation requirements; it logs `ledger/loops.jsonl` and also returns `may_execute: false`. `/cognition/status` exposes an AGI-ish engineering capability map—not an AGI or consciousness claim—and `/cognition/tick` runs one bounded meta-cognitive cycle: assess gaps, choose/accept a goal, run one proposal-only governed step, remember evidence, and log `ledger/cognition.jsonl`, always with `may_execute: false`. `/learning/score` scores step/loop trajectories, `/learning/export-sft` exports usable traces to `data/self_train/trajectory_sft.jsonl`, and `/learning/package` writes `data/self_train/package_manifest.json` with provenance hashes; `/learning/drift`, `/learning/provenance`, and `/learning/promotion-gate` add objective distribution/provenance/promotion checks. Learning outputs prepare data only and cannot promote model weights. Material actions must still pass auth, signed intent, Guardian, witness, and ledger gates. If `CORTEX_REQUIRE_PROPOSAL_IDS=1`, material endpoints such as `/memory/write`, `/tool/execute`, `/patch/apply`, `/build/apply`, deploy, checkout, quarantine, self-training, and state import reject requests that do not include a matching `proposal_id`.
 
 ## Start local dashboard
 
@@ -259,6 +259,13 @@ curl -X POST "$BASE/deliberate" \
   -d '{"task":"choose the safest next step","authority":"interpret","context":{"tools":[]}}'
 
 curl "$BASE/tools/report"
+curl -X POST "$BASE/events/record" -H 'content-type: application/json' -d '{"source":"operator","event_type":"note","payload":{"text":"review needed"}}'
+curl "$BASE/events/report"
+curl "$BASE/world/adapters"
+curl "$BASE/operator/console"
+curl -X POST "$BASE/learning/drift" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/learning/provenance" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/learning/promotion-gate" -H 'content-type: application/json' -d '{"min_score":85,"min_samples":10}'
 
 curl -X POST "$BASE/immune/scan" \
   -H 'content-type: application/json' \
@@ -356,11 +363,15 @@ data/self_train/report.json
 ledger/training.jsonl
 ```
 
-Promotion status is always:
+The trajectory learning bridge also exposes objective no-promotion gates:
 
-```text
-blocked_without_witness
+```bash
+curl -X POST "$BASE/learning/drift" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/learning/provenance" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/learning/promotion-gate" -H 'content-type: application/json' -d '{"min_score":85,"min_samples":10}'
 ```
+
+Promotion status remains blocked unless external human review/witness and objective metrics pass; Cortex still cannot promote its own weights.
 
 ## The Semantic Compression Language (SCL)
 
@@ -420,7 +431,9 @@ The system has two connected strata.
 17. **Tool Gateway/Registry (`cortex.tool_gateway`, `cortex.tool_registry`)**: Bounded tools through Guardian/Scribe with fine-grained required capabilities, sandbox profiles, and objective postcondition coverage.
 18. **Specialists (`cortex.specialists`)**: Narrow local authority, risk, and refusal classifiers.
 19. **Self-Training (`cortex.self_train`)**: Converts ledger events into candidate datasets and reports; promotion is blocked without witness.
-21. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
+20. **Trajectory Learning (`cortex.trajectory_score`)**: Scores trajectories, exports SFT candidates, packages provenance, checks drift, and gates promotion objectively without self-promotion.
+21. **World Interface (`cortex.world_interface`)**: Durable event bus, evidence-backed sensory adapter inventory, and operator console for human proposal review.
+22. **Sacred CLI (`cortex.sacred`)**: Local ritual invocation, witness, refusal, and remote-git inspection utilities.
 
 ## Repository Structure
 

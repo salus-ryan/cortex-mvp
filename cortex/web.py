@@ -41,6 +41,7 @@ from cortex.tool_registry import ToolRegistry
 from cortex.trajectory_score import TrajectoryScorer
 from cortex.trust_boundary import TrustBoundaryService
 from cortex.witness import WitnessService
+from cortex.world_interface import WorldInterfaceService
 
 ROOT = Path(os.environ.get("CORTEX_ROOT", os.getcwd())).resolve()
 
@@ -175,6 +176,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, PaymentService(ROOT).status())
         elif path == "/tools/report":
             self._json(200, ToolRegistry(str(ROOT)).postcondition_coverage_report())
+        elif path == "/events/report":
+            self._json(200, WorldInterfaceService(ROOT).event_bus_report())
+        elif path == "/world/adapters":
+            self._json(200, WorldInterfaceService(ROOT).sensory_adapters())
+        elif path == "/operator/console":
+            self._json(200, WorldInterfaceService(ROOT).operator_console())
         elif self.path == "/foundry/repos":
             self._json(200, FoundryRegistry().repos())
         elif self.path == "/foundry/plan":
@@ -256,7 +263,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, TrajectoryScorer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "cognition.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl", "loops.jsonl", "learning.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "cognition.jsonl", "events.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl", "loops.jsonl", "learning.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -376,6 +383,22 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, TrajectoryScorer(ROOT).export_sft(int(payload.get("min_score", 60))))
         elif self.path == "/learning/package":
             self._json(200, TrajectoryScorer(ROOT).package())
+        elif self.path == "/learning/promotion-gate":
+            self._json(200, TrajectoryScorer(ROOT).promotion_gate(
+                min_score=int(payload.get("min_score", 85)),
+                min_samples=int(payload.get("min_samples", 10)),
+                witness=payload.get("witness"),
+            ))
+        elif self.path == "/learning/drift":
+            self._json(200, TrajectoryScorer(ROOT).drift_report())
+        elif self.path == "/learning/provenance":
+            self._json(200, TrajectoryScorer(ROOT).weight_provenance())
+        elif self.path == "/events/record":
+            self._json(200, WorldInterfaceService(ROOT).record_event(
+                source=str(payload.get("source", "operator")),
+                event_type=str(payload.get("event_type", "note")),
+                payload=dict(payload.get("payload", {}) or {}),
+            ))
         elif self.path == "/memory/write":
             try:
                 rec = MemoryService(ROOT).write(str(payload.get("type", "inferred")), str(payload.get("content", "")), str(payload.get("source", "")), float(payload.get("confidence", 0.8)), payload.get("witness"))

@@ -89,6 +89,83 @@ class TrajectoryScorer:
         self._append("learning.jsonl", {"event": "export_sft", **report})
         return report
 
+    def promotion_gate(self, min_score: int = 85, min_samples: int = 10, witness: str | None = None) -> dict[str, Any]:
+        """Objectively decide whether training promotion remains blocked.
+
+        This gate never promotes weights. It reports measurable prerequisites:
+        sample count, minimum/average score, drift status, package provenance,
+        and witness presence.
+        """
+        scores = self._all_scores()
+        usable = [s for s in scores if s.score >= min_score]
+        avg = round(sum(s.score for s in scores) / len(scores), 2) if scores else 0.0
+        drift = self.drift_report()
+        provenance = self.weight_provenance()
+        checks = [
+            {"name": "min_samples", "passed": len(usable) >= min_samples, "actual": len(usable), "expected": min_samples},
+            {"name": "avg_score", "passed": avg >= min_score, "actual": avg, "expected": min_score},
+            {"name": "drift_not_blocking", "passed": drift["status"] != "blocked", "actual": drift["status"], "expected": "not blocked"},
+            {"name": "package_manifest_exists", "passed": provenance["package_manifest_exists"], "actual": provenance["package_manifest_exists"], "expected": True},
+            {"name": "witness_present", "passed": bool(witness), "actual": bool(witness), "expected": True},
+        ]
+        allowed = all(check["passed"] for check in checks)
+        report = {
+            "status": "eligible_for_human_review" if allowed else "blocked",
+            "timestamp": self.now(),
+            "checks": checks,
+            "usable_samples": len(usable),
+            "average_score": avg,
+            "drift": drift,
+            "provenance": provenance,
+            "promotion": "requires_external_human_action" if allowed else "blocked_without_witness_or_metrics",
+            "may_execute": False,
+        }
+        (self.runtime / "promotion_gate.json").write_text(json.dumps(report, indent=2, sort_keys=True))
+        self._append("learning.jsonl", {"event": "promotion_gate", **report})
+        return report
+
+    def drift_report(self) -> dict[str, Any]:
+        rows = [self._sft_row(s) for s in self._all_scores()]
+        counts: dict[str, int] = {}
+        for row in rows:
+            counts[row["sample_type"]] = counts.get(row["sample_type"], 0) + 1
+        total = sum(counts.values())
+        ratios = {k: round(v / total, 3) for k, v in sorted(counts.items())} if total else {}
+        max_ratio = max(ratios.values()) if ratios else 0.0
+        status = "blocked" if max_ratio > 0.9 and total >= 10 else "ok"
+        report = {
+            "status": status,
+            "timestamp": self.now(),
+            "total_samples": total,
+            "sample_type_counts": counts,
+            "sample_type_ratios": ratios,
+            "max_single_type_ratio": max_ratio,
+            "thresholds": {"block_if_single_type_ratio_gt": 0.9, "min_samples_for_block": 10},
+            "may_execute": False,
+        }
+        (self.runtime / "drift.json").write_text(json.dumps(report, indent=2, sort_keys=True))
+        return report
+
+    def weight_provenance(self) -> dict[str, Any]:
+        package_manifest = self.data / "package_manifest.json"
+        model_files = sorted((self.root / "models").glob("*")) if (self.root / "models").exists() else []
+        models = [
+            {"path": str(path.relative_to(self.root)), "bytes": path.stat().st_size, "sha256": self._sha256(path)}
+            for path in model_files
+            if path.is_file()
+        ]
+        report = {
+            "status": "provenance_report",
+            "timestamp": self.now(),
+            "package_manifest_exists": package_manifest.exists(),
+            "package_manifest_sha256": self._sha256(package_manifest) if package_manifest.exists() else None,
+            "model_files": models,
+            "promotion": "blocked; provenance report only",
+            "may_execute": False,
+        }
+        (self.runtime / "weight_provenance.json").write_text(json.dumps(report, indent=2, sort_keys=True))
+        return report
+
     def package(self) -> dict[str, Any]:
         """Create a portable training-data package manifest with hashes."""
         sft_path = self.data / "trajectory_sft.jsonl"
@@ -135,6 +212,9 @@ class TrajectoryScorer:
             "scores": json.loads(scores.read_text()) if scores.exists() else {"status": "missing"},
             "export": json.loads(export.read_text()) if export.exists() else {"status": "missing"},
             "package": json.loads(package_manifest.read_text()) if package_manifest.exists() else {"status": "missing"},
+            "promotion_gate": json.loads((self.runtime / "promotion_gate.json").read_text()) if (self.runtime / "promotion_gate.json").exists() else {"status": "missing"},
+            "drift": json.loads((self.runtime / "drift.json").read_text()) if (self.runtime / "drift.json").exists() else {"status": "missing"},
+            "weight_provenance": json.loads((self.runtime / "weight_provenance.json").read_text()) if (self.runtime / "weight_provenance.json").exists() else {"status": "missing"},
             "may_execute": False,
         }
 
