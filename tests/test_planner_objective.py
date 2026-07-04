@@ -34,3 +34,26 @@ def test_planner_orders_by_objective_priority(tmp_path: Path):
         "target": "runtime/prophet/latest.json:status",
         "expected": "pass",
     }
+
+
+def test_planner_decomposes_goal_into_objective_phases(tmp_path: Path):
+    result = PlannerService(tmp_path).decompose("Build durable recall")
+
+    assert result["status"] == "decomposed"
+    assert result["step_count"] == 4
+    assert [step["phase"] for step in result["steps"]] == ["observe", "design", "verify", "record"]
+    assert all(step["success_metrics"] for step in result["steps"])
+    assert all(step["may_execute"] is False for step in result["steps"])
+    assert result["may_execute"] is False
+
+
+def test_planner_counterfactuals_are_numeric_and_sorted(tmp_path: Path):
+    result = PlannerService(tmp_path).counterfactuals("Build durable recall")
+
+    assert result["status"] == "counterfactuals"
+    assert result["scoring_rule"] == "net_score = expected_benefit - risk"
+    assert [option["net_score"] for option in result["options"]] == sorted(
+        [option["net_score"] for option in result["options"]], reverse=True
+    )
+    assert all(option["net_score"] == option["expected_benefit"] - option["risk"] for option in result["options"])
+    assert result["may_execute"] is False

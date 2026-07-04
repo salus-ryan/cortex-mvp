@@ -95,8 +95,34 @@ class PlannerService:
 
     def choose_next(self) -> dict[str, Any]:
         backlog = self.backlog()
-        item = backlog["backlog"][0] if backlog.get("backlog") else self._item("none", "No work available.", "observe")
+        item = backlog["backlog"][0] if backlog.get("backlog") else self._item(
+            "none", "No work available.", "observe", severity=0, evidence_paths=["runtime/planner/backlog.json"], success_metrics=[]
+        )
         return {"status": "chosen", "next_action": item, "may_execute": False, "requires_human_or_tool_gateway": True}
+
+    def decompose(self, goal: str) -> dict[str, Any]:
+        goal = " ".join(goal.split())[:300]
+        if not goal:
+            return {"status": "refused", "reason": "goal is required", "may_execute": False}
+        steps = [
+            self._subtask("observe", goal, "Collect current objective evidence and constraints.", "observe"),
+            self._subtask("design", goal, "Draft the smallest reversible change with measurable success metrics.", "prepare"),
+            self._subtask("verify", goal, "Run deterministic tests or file/hash checks that prove the metric.", "observe"),
+            self._subtask("record", goal, "Write ledger/memory evidence and stop before material execution.", "interpret"),
+        ]
+        return {"status": "decomposed", "goal": goal, "steps": steps, "step_count": len(steps), "may_execute": False}
+
+    def counterfactuals(self, goal: str) -> dict[str, Any]:
+        goal = " ".join(goal.split())[:300]
+        if not goal:
+            return {"status": "refused", "reason": "goal is required", "may_execute": False}
+        options = [
+            {"option": "minimal_patch", "expected_benefit": 60, "risk": 20, "net_score": 40, "verification": "targeted tests pass"},
+            {"option": "test_first", "expected_benefit": 50, "risk": 10, "net_score": 40, "verification": "failing test becomes passing"},
+            {"option": "defer_for_witness", "expected_benefit": 20, "risk": 5, "net_score": 15, "verification": "witness record exists"},
+        ]
+        options.sort(key=lambda item: item["net_score"], reverse=True)
+        return {"status": "counterfactuals", "goal": goal, "options": options, "scoring_rule": "net_score = expected_benefit - risk", "may_execute": False}
 
     def backlog(self) -> dict[str, Any]:
         if self.backlog_path.exists():
@@ -105,6 +131,16 @@ class PlannerService:
 
     def _metric(self, name: str, verifier: str, target: str, expected: Any) -> dict[str, Any]:
         return {"name": name, "verifier": verifier, "target": target, "expected": expected}
+
+    def _subtask(self, phase: str, goal: str, description: str, authority: str) -> dict[str, Any]:
+        return {
+            "id": f"{phase}_{abs(hash((phase, goal))) % 100000}",
+            "phase": phase,
+            "description": description,
+            "authority_required": authority,
+            "success_metrics": [self._metric(f"{phase}_complete", "evidence_present", phase, True)],
+            "may_execute": False,
+        }
 
     def _item(
         self,

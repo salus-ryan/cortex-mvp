@@ -55,3 +55,19 @@ def test_memory_search_returns_ranked_quality_records(tmp_path: Path):
     assert result["records"][0]["quality"]["threshold_band"] == "75-100"
     assert result["records"][0]["quality"]["components"]["confidence_points"] == 33
     assert result["may_execute"] is False
+
+
+def test_episodic_recall_reads_memory_and_ledgers(tmp_path: Path):
+    svc = MemoryService(tmp_path)
+    svc.write("project", "episodic memory should include durable project records", "test", confidence=0.9)
+    ledger = tmp_path / "ledger"
+    ledger.mkdir(exist_ok=True)
+    (ledger / "steps.jsonl").write_text('{"timestamp":"2026-01-01T00:00:00+00:00","goal":"episodic step proof","status":"stepped"}\n')
+
+    result = svc.episodic_recall("episodic")
+
+    assert result["status"] == "episodic_recall"
+    assert result["episode_count"] == 2
+    assert {ep["source_stream"] for ep in result["episodes"]} == {"steps.jsonl", "memory/project"}
+    assert all(ep["may_execute"] is False for ep in result["episodes"])
+    assert result["may_execute"] is False

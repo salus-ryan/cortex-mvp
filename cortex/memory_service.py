@@ -65,6 +65,15 @@ class MemoryService:
         scored.sort(key=lambda rec: (rec.get("quality", {}).get("score", 0), rec.get("created_at", "")), reverse=True)
         return {"status": "ok", "query": query, "type": typ or "all", "records": scored[:limit], "may_execute": False}
 
+    def episodic_recall(self, query: str = "", limit: int = 20) -> dict[str, Any]:
+        """Recall long-horizon episodes from durable memory plus ledgers."""
+        q = query.lower().strip()
+        episodes = self._ledger_episodes() + [self._memory_episode(rec) for rec in self._active_records()]
+        if q:
+            episodes = [ep for ep in episodes if q in json.dumps(ep, sort_keys=True).lower()]
+        episodes.sort(key=lambda ep: str(ep.get("timestamp", ep.get("created_at", ""))), reverse=True)
+        return {"status": "episodic_recall", "query": query, "episodes": episodes[:limit], "episode_count": len(episodes), "may_execute": False}
+
     def score_record(self, rec: dict[str, Any], duplicate_count: int = 1) -> dict[str, Any]:
         """Attach an inspectable memory quality score.
 
@@ -195,6 +204,40 @@ class MemoryService:
     def _fingerprint(self, rec: dict[str, Any]) -> str:
         content = " ".join(str(rec.get("content", "")).lower().split())
         return hashlib.sha256(f"{rec.get('type')}:{content}".encode()).hexdigest()[:16]
+
+    def _ledger_episodes(self) -> list[dict[str, Any]]:
+        episodes: list[dict[str, Any]] = []
+        ledger = self.root / "ledger"
+        for stream in ["steps.jsonl", "loops.jsonl", "cognition.jsonl", "actions.jsonl"]:
+            path = ledger / stream
+            if not path.exists():
+                continue
+            for idx, line in enumerate(path.read_text().splitlines(), start=1):
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                episodes.append({
+                    "id": f"episode_{stream}_{idx}",
+                    "source_stream": stream,
+                    "timestamp": rec.get("timestamp"),
+                    "summary": rec.get("selected_goal") or rec.get("goal") or rec.get("action_type") or rec.get("status"),
+                    "record": rec,
+                    "may_execute": False,
+                })
+        return episodes
+
+    def _memory_episode(self, rec: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": f"episode_{rec.get('id')}",
+            "source_stream": f"memory/{rec.get('type')}",
+            "timestamp": rec.get("created_at"),
+            "summary": rec.get("content"),
+            "record": rec,
+            "may_execute": False,
+        }
 
     def _recommendations(self, scored: list[dict[str, Any]], duplicates: list[dict[str, Any]]) -> list[str]:
         recommendations: list[str] = []

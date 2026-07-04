@@ -191,6 +191,11 @@ class Handler(BaseHTTPRequestHandler):
                 typ=(query.get("type") or [None])[0],
                 limit=int((query.get("limit") or [20])[0]),
             ))
+        elif path == "/memory/episodes":
+            self._json(200, MemoryService(ROOT).episodic_recall(
+                query=(query.get("q") or query.get("query") or [""])[0],
+                limit=int((query.get("limit") or [20])[0]),
+            ))
         elif self.path == "/state/manifest":
             self._json(200, StateService(ROOT).manifest())
         elif self.path == "/state/export":
@@ -228,6 +233,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AwarenessService(ROOT).state())
         elif self.path == "/awareness/latest":
             self._json(200, AwarenessService(ROOT).latest())
+        elif path == "/awareness/self-model":
+            self._json(200, AwarenessService(ROOT).machine_self_model())
         elif self.path == "/cognition/status":
             self._json(200, CognitionKernel(ROOT).status())
         elif self.path == "/cognition/latest":
@@ -412,6 +419,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, PlannerService(ROOT).reflect())
         elif self.path == "/planner/choose-next":
             self._json(200, PlannerService(ROOT).choose_next())
+        elif self.path == "/planner/decompose":
+            self._json(200, PlannerService(ROOT).decompose(str(payload.get("goal", payload.get("task", "")))) )
+        elif self.path == "/planner/counterfactuals":
+            self._json(200, PlannerService(ROOT).counterfactuals(str(payload.get("goal", payload.get("task", "")))) )
         elif self.path == "/tool/execute":
             result = ToolGateway(ROOT).execute(str(payload.get("tool", "")), dict(payload.get("args", {}) or {}), str(payload.get("authority", "observe")), payload.get("witness"))
             self._json(200 if result["status"] == "completed" else 403, result)

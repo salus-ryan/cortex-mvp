@@ -233,9 +233,13 @@ curl -X POST "$BASE/memory/write" \
   -d '{"type":"factual","content":"Cortex runs as PID 1","source":"human witness"}'
 curl "$BASE/memory/report"
 curl "$BASE/memory/search?q=Cortex&type=factual"
+curl "$BASE/memory/episodes?q=Cortex"
+curl "$BASE/awareness/self-model"
 
 curl -X POST "$BASE/planner/reflect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/planner/choose-next" -H 'content-type: application/json' -d '{}'
+curl -X POST "$BASE/planner/decompose" -H 'content-type: application/json' -d '{"goal":"Build durable recall"}'
+curl -X POST "$BASE/planner/counterfactuals" -H 'content-type: application/json' -d '{"goal":"Build durable recall"}'
 # Planner backlog items include objective_priority, evidence_paths, and measurable success_metrics.
 
 curl -X POST "$BASE/step" \
@@ -396,15 +400,15 @@ The system has two connected strata.
 ### PID-1 Service Stratum
 
 1. **Auth (`cortex.auth`)**: Token/capability primitive for protected material endpoints, with auth audit ledger.
-2. **Awareness (`cortex.awareness`)**: Explicit self-model and bounded reflection; does not claim proven consciousness.
+2. **Awareness (`cortex.awareness`)**: Explicit machine-readable self-model, boot/runtime attestation hashes, and bounded reflection; does not claim proven consciousness.
 3. **Supervisor (`cortex.pid1`)**: Container PID 1. Starts children, handles signals, reaps exits, logs lifecycle, and shuts down honestly.
 2. **Web Surface (`cortex.web`)**: HTTP health, status, invoke, self-test, law, PID-1, and ledger endpoints.
 3. **Oracle Adapter (`cortex.oracle`)**: Optional rented intelligence through OpenAI/OpenRouter or safe local echo mode. Proposes only; never executes.
 4. **Guardian/Scribe Pipeline (`cortex.services`)**: Deterministic authority checks and append-only ledger writes for public invocation.
 5. **Prophet (`cortex.prophet`)**: Deterministic drift, law, PID-1, guardian refusal, oracle boundary, and ledger checks.
-6. **Memory (`cortex.memory_service`)**: Typed, sourced JSONL memory with personal-memory witness requirements, quality scoring, duplicate detection, and ranked search/report endpoints.
+6. **Memory (`cortex.memory_service`)**: Typed, sourced JSONL memory with personal-memory witness requirements, quality scoring, duplicate detection, long-horizon episodic recall from ledgers, and ranked search/report endpoints.
 7. **Witness (`cortex.witness`)**: Human attestation and governance primitives.
-8. **Planner (`cortex.planner`)**: Self-organization backlog and objectively scored next-action choice with evidence paths and measurable success metrics; may choose but not execute.
+8. **Planner (`cortex.planner`)**: Self-organization backlog, objective next-action choice, hierarchical decomposition, and numeric counterfactual planning with evidence paths and measurable success metrics; may choose but not execute.
 9. **Deliberation (`cortex.deliberation`)**: Local multi-step reasoning loop: evidence, specialists, Guardian, Prophet, scored recommendations; never executes.
 10. **Immune (`cortex.immune`)**: Artificial immune system for antigen detection, quarantine recommendations, immune memory, and rejected-memory records.
 11. **Pi Extension (`.pi/extensions/cortex.ts`)**: Lets Pi use Cortex as an immune/governance layer and registers Cortex as an OpenAI-compatible local provider.

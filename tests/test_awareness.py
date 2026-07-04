@@ -22,6 +22,10 @@ def test_awareness_state_reads_pid1(tmp_path: Path):
     assert state["consciousness_claim"] == "not_proven"
     assert state["self_model"]["is_pid1"] is True
     assert state["self_model"]["running_children"] == ["oracle", "web"]
+    assert state["machine_self_model"]["schema_version"] == "cortex.self_model.v1"
+    assert state["machine_self_model"]["runtime"]["running_children"] == ["oracle", "web"]
+    assert state["boot_attestation"]["status"] == "attested"
+    assert len(state["boot_attestation"]["attestation_hash"]) == 64
     assert state["may_execute"] is False
 
 

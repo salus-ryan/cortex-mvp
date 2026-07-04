@@ -189,8 +189,15 @@ class CognitionKernel:
             CapabilityProbe(
                 "self_model",
                 15,
-                self._existing(files, ["cortex/awareness.py", "cortex/pid1.py", "runtime/permissions.json", "LAW.md"]),
-                ["stable machine-readable self model", "boot/runtime attestation linked into awareness"],
+                self._existing(files, ["cortex/awareness.py", "cortex/pid1.py", "runtime/permissions.json", "LAW.md"])
+                + self._code_evidence(
+                    "cortex/awareness.py",
+                    {
+                        "stable machine-readable self model": "schema_version",
+                        "boot/runtime attestation linked into awareness": "boot_attestation",
+                    },
+                ),
+                [],
             ),
             CapabilityProbe(
                 "memory",
@@ -202,9 +209,10 @@ class CognitionKernel:
                         "memory quality scoring": "def score_record",
                         "memory quality report": "def report",
                         "ranked memory search": "def search",
+                        "long-horizon episodic recall": "def episodic_recall",
                     },
                 ),
-                ["long-horizon episodic recall", "human-editable forgetting UX"],
+                ["human-editable forgetting UX"],
             ),
             CapabilityProbe(
                 "planning",
@@ -215,9 +223,11 @@ class CognitionKernel:
                     {
                         "explicit success metrics per goal": "success_metrics",
                         "objective priority scoring": "objective_priority",
+                        "hierarchical task decomposition": "def decompose",
+                        "counterfactual planning": "def counterfactuals",
                     },
                 ),
-                ["hierarchical task decomposition", "counterfactual planning"],
+                [],
             ),
             CapabilityProbe(
                 "tool_use_under_law",
