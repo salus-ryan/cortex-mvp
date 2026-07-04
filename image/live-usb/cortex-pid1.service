@@ -1,0 +1,21 @@
+[Unit]
+Description=Cortex governed AI runtime supervisor
+Documentation=file:/opt/cortex/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cortex
+Environment=PYTHONUNBUFFERED=1
+Environment=CORTEX_ROOT=/opt/cortex
+Environment=CORTEX_PROFILE=compact
+Environment=PORT=8080
+ExecStart=/usr/bin/python3 -m cortex.pid1
+Restart=on-failure
+RestartSec=3
+StateDirectory=cortex
+RuntimeDirectory=cortex
+
+[Install]
+WantedBy=multi-user.target

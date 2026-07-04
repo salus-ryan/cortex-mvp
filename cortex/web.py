@@ -12,6 +12,7 @@ from typing import Any
 from cortex.auth import AuthService, PATH_CAPABILITIES
 from cortex.awareness import AwarenessService
 from cortex.build_loop import BuildLoopService
+from cortex.cognition import CognitionKernel
 from cortex.concept_graph import ConceptGraphService
 from cortex.deliberation import DeliberationService
 from cortex.deploy_service import DeployService
@@ -216,6 +217,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, AwarenessService(ROOT).state())
         elif self.path == "/awareness/latest":
             self._json(200, AwarenessService(ROOT).latest())
+        elif self.path == "/cognition/status":
+            self._json(200, CognitionKernel(ROOT).status())
+        elif self.path == "/cognition/latest":
+            self._json(200, CognitionKernel(ROOT).latest())
         elif self.path == "/step/latest":
             self._json(200, CortexStepFunction(ROOT).latest())
         elif self.path == "/loop/latest":
@@ -233,7 +238,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, TrajectoryScorer(ROOT).report())
         elif self.path.startswith("/ledger/"):
             stream = self.path.removeprefix("/ledger/")
-            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl", "loops.jsonl", "learning.jsonl"}:
+            if stream not in {"actions.jsonl", "refusals.jsonl", "witnesses.jsonl", "mutations.jsonl", "pid1-signals.jsonl", "training.jsonl", "immune.jsonl", "repo.jsonl", "patch.jsonl", "build.jsonl", "deploy.jsonl", "payments.jsonl", "awareness.jsonl", "cognition.jsonl", "auth.jsonl", "model-proposals.jsonl", "next-steps.jsonl", "steps.jsonl", "loops.jsonl", "learning.jsonl"}:
                 self._json(404, {"status": "unknown_ledger_stream"})
             else:
                 self._json(200, {"status": "ok", "stream": stream, "records": ScribeClient(ROOT).read_tail(stream)})
@@ -329,6 +334,13 @@ class Handler(BaseHTTPRequestHandler):
                 context=dict(payload.get("context", {}) or {}),
             )
             self._json(200 if result["status"] == "looped" else 400, result)
+        elif self.path == "/cognition/tick":
+            result = CognitionKernel(ROOT).tick(
+                goal=str(payload.get("goal", payload.get("task", ""))) or None,
+                authority=str(payload.get("authority", "interpret")),
+                context=dict(payload.get("context", {}) or {}),
+            )
+            self._json(200 if result["status"] == "cognition_tick" else 400, result)
         elif self.path == "/self-test":
             result = pipeline.self_test()
             self._json(200 if result["status"] == "pass" else 500, result)

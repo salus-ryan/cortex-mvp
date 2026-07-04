@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+set -eu
+
+# Mount persistent Cortex state if a partition labeled CORTEX_STATE exists.
+# Safe fallback: create volatile/directories under /var/lib/cortex.
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+STATE_MOUNT=${CORTEX_STATE_MOUNT:-/var/lib/cortex}
+STATE_LABEL=${CORTEX_STATE_LABEL:-CORTEX_STATE}
+CORTEX_ROOT=${CORTEX_ROOT:-/opt/cortex}
+
+mkdir -p "$STATE_MOUNT"
+
+if command -v blkid >/dev/null 2>&1; then
+  DEV="$(blkid -L "$STATE_LABEL" 2>/dev/null || true)"
+  if [ -n "$DEV" ] && ! mountpoint -q "$STATE_MOUNT"; then
+    mount "$DEV" "$STATE_MOUNT"
+  fi
+fi
+
+mkdir -p \
+  "$STATE_MOUNT/ledger" \
+  "$STATE_MOUNT/runtime" \
+  "$STATE_MOUNT/data" \
+  "$STATE_MOUNT/memory" \
+  "$STATE_MOUNT/forge"
+
+# Preserve static runtime policy when runtime/ is made persistent.
+if [ -f "$CORTEX_ROOT/runtime/permissions.json" ] && [ ! -f "$STATE_MOUNT/runtime/permissions.json" ]; then
+  cp "$CORTEX_ROOT/runtime/permissions.json" "$STATE_MOUNT/runtime/permissions.json"
+fi
+
+# Cortex code resolves mutable paths under CORTEX_ROOT. Bind persistent state
+# over those directories so existing code gains USB persistence without special
+# cases or environment-specific path rewrites.
+for dir in ledger runtime data memory; do
+  mkdir -p "$CORTEX_ROOT/$dir" "$STATE_MOUNT/$dir"
+  if ! mountpoint -q "$CORTEX_ROOT/$dir"; then
+    mount --bind "$STATE_MOUNT/$dir" "$CORTEX_ROOT/$dir" || true
+  fi
+done
+
+chmod 700 "$STATE_MOUNT" || true

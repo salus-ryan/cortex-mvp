@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+set -eu
+
+# Experimental userspace init for Cortex Live USB.
+# Intended for kernel boot parameter: init=/opt/cortex/bin/cortex-init
+# This is deliberately small: mount essentials, prepare state, then exec Cortex.
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH PYTHONUNBUFFERED=1 CORTEX_ROOT=/opt/cortex CORTEX_PROFILE=${CORTEX_PROFILE:-compact} PORT=${PORT:-8080}
+
+mountpoint -q /proc || mount -t proc proc /proc || true
+mountpoint -q /sys || mount -t sysfs sysfs /sys || true
+mountpoint -q /dev || mount -t devtmpfs devtmpfs /dev || true
+mkdir -p /dev/pts /run /tmp /var/lib/cortex/ledger /var/lib/cortex/runtime /var/lib/cortex/data /var/lib/cortex/memory
+mountpoint -q /dev/pts || mount -t devpts devpts /dev/pts || true
+mountpoint -q /run || mount -t tmpfs tmpfs /run || true
+mountpoint -q /tmp || mount -t tmpfs tmpfs /tmp || true
+
+# If a persistence partition labeled CORTEX_STATE exists, prefer it.
+if command -v blkid >/dev/null 2>&1; then
+  STATE_DEV="$(blkid -L CORTEX_STATE 2>/dev/null || true)"
+  if [ -n "$STATE_DEV" ]; then
+    mkdir -p /var/lib/cortex
+    mountpoint -q /var/lib/cortex || mount "$STATE_DEV" /var/lib/cortex || true
+    mkdir -p /var/lib/cortex/ledger /var/lib/cortex/runtime /var/lib/cortex/data /var/lib/cortex/memory
+  fi
+fi
+
+if [ -x /opt/cortex/bin/mount-cortex-state ]; then
+  /opt/cortex/bin/mount-cortex-state || true
+fi
+
+cd /opt/cortex
+exec python3 -m cortex.pid1

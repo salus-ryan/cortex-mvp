@@ -1,0 +1,13 @@
+[Unit]
+Description=Mount Cortex persistent state partition
+DefaultDependencies=no
+After=local-fs.target
+Before=cortex-pid1.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/cortex/bin/mount-cortex-state
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
