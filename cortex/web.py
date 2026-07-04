@@ -20,6 +20,7 @@ from cortex.immune import ImmuneService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
 from cortex.memory_service import MemoryService
+from cortex.model_registry import ModelRegistry
 from cortex.loop import CortexLoop
 from cortex.oauth import OAuthService
 from cortex.patch_service import PatchService
@@ -130,7 +131,15 @@ class Handler(BaseHTTPRequestHandler):
             law = ROOT / "LAW.md"
             self._json(200, {"law": law.read_text() if law.exists() else "LAW.md missing"})
         elif self.path == "/v1/models":
-            self._json(200, {"object": "list", "data": [{"id": "cortex-local-mind-v1", "object": "model", "owned_by": "cortex"}, {"id": "cortex-deliberative-v1", "object": "model", "owned_by": "cortex"}]})
+            registry = ModelRegistry().manifest()
+            compat = [
+                {"id": "cortex-local-mind-v1", "object": "model", "owned_by": "cortex", "provider": "local", "tier": "local_fast", "available": True},
+                {"id": "cortex-deliberative-v1", "object": "model", "owned_by": "cortex", "provider": "local", "tier": "deliberative", "available": True},
+            ]
+            routed = [{"id": m["model"], "object": "model", "owned_by": "cortex", "provider": m["provider"], "tier": m["tier"], "available": m["available"]} for m in registry["models"]]
+            self._json(200, {"object": "list", "data": compat + routed})
+        elif self.path == "/models/registry":
+            self._json(200, ModelRegistry().manifest())
         elif self.path == "/pid1":
             status = ROOT / "runtime" / "pid1.json"
             if status.exists():

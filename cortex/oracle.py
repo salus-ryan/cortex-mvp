@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from cortex.local_mind import LocalMind
+from cortex.model_registry import ModelRegistry
 from cortex.sacred import ANTI_IDOLATRY
 
 
@@ -37,6 +38,7 @@ class OracleResult:
     law: list[str]
     uncertainty: str
     local_mind: dict[str, Any] = field(default_factory=dict)
+    route: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         data = {
@@ -52,12 +54,15 @@ class OracleResult:
         }
         if self.local_mind:
             data["local_mind"] = self.local_mind
+        if self.route:
+            data["route"] = self.route
         return data
 
 
 class OracleService:
     def __init__(self, root: Path | str = ".") -> None:
         self.root = Path(root)
+        self.registry = ModelRegistry()
         self.provider = os.environ.get("ORACLE_PROVIDER", "local").lower()
         self.model = os.environ.get("ORACLE_MODEL", self._default_model())
 
@@ -69,8 +74,12 @@ class OracleService:
         return "local-mind-v1"
 
     def propose(self, task: str, authority: str = "interpret", context: dict[str, Any] | None = None) -> OracleResult:
-        prompt = self._build_prompt(task, authority, context or {})
-        local = LocalMind(self.root).think(task, authority, context or {})
+        context = context or {}
+        route = self.registry.route(task, authority, context)
+        self.provider = route["provider"]
+        self.model = route["model"]
+        prompt = self._build_prompt(task, authority, context)
+        local = LocalMind(self.root).think(task, authority, context)
         if self.provider == "openai" and os.environ.get("OPENAI_API_KEY"):
             text = self._call_openai(prompt)
             uncertainty = "Rented oracle output is interpretation, not authority. Human review remains required."
@@ -93,6 +102,7 @@ class OracleService:
             law=["LAW 1", "LAW 4", "LAW 7", "LAW 9"],
             uncertainty=uncertainty,
             local_mind={k: v for k, v in local.items() if k != "proposal"},
+            route=route,
         )
         return result
 

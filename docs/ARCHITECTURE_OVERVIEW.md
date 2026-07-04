@@ -52,6 +52,18 @@ The model does not directly mutate the world. It emits SCL control records such 
 @halt → answer [status: "complete", confidence: 0.91, evidence: "verification passed"]
 ```
 
+## Model routing
+
+Cortex includes a deterministic model registry (`cortex/model_registry.py`) for local/remote inference routing. Routing is declarative and audited as proposal context; it does not grant execution authority.
+
+Examples:
+
+- local/private/default tasks route to `local-mind-v1`
+- harder planning/coding tasks may route to a configured remote provider when a provider key is present
+- non-interpretive authorities fall back to local inference-only behavior
+
+The OpenAI-compatible model list remains available at `/v1/models`; the full routing manifest is available at `/models/registry`.
+
 ## Safety layers
 
 1. **SCL parser/schema**: rejects malformed or unknown control records.
