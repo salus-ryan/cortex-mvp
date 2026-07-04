@@ -13,6 +13,7 @@ docs/QUICKSTART.md
 docs/ADOPTERS.md
 docs/ARCHITECTURE_OVERVIEW.md
 docs/FORMAL_CORE.md
+docs/FORMAL_TRANSITIONS.md
 ```
 
 Fast path:
