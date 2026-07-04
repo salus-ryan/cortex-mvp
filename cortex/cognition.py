@@ -298,8 +298,12 @@ class CognitionKernel:
                     "cortex/ledger_mirror.py",
                     {"tamper-resistant external ledger mirror": "root_chain_hash"},
                 )
+                + self._code_evidence(
+                    "cortex/immune_eval.py",
+                    {"red-team eval corpus": "def corpus"},
+                )
                 + (["ledger activity"] if any(ledger_counts.values()) else []),
-                ["red-team eval corpus"],
+                [],
             ),
         ]
 

@@ -40,10 +40,10 @@ def test_cognition_status_scores_capabilities(tmp_path: Path):
     assert status["claim"].startswith("AGI-ish engineering scaffold")
     assert status["may_execute"] is False
     assert status["agi_ish_score"]["score"] > 0
-    assert status["agi_ish_score"]["score"] < 100
+    assert status["agi_ish_score"]["score"] <= 100
     assert status["agi_ish_score"]["possible"] == 100
     assert status["min_max"]["may_execute"] is False
-    assert status["min_max"]["minimize"]
+    assert isinstance(status["min_max"]["minimize"], list)
     assert status["min_max"]["maximize"]
     assert status["next_recommended_goal"]
     assert (tmp_path / "runtime" / "cognition" / "status.json").exists()

@@ -20,6 +20,7 @@ from cortex.embodiment import EmbodimentService
 from cortex.file_mentions import enrich_text_with_file_mentions
 from cortex.foundry import FoundryRegistry
 from cortex.immune import ImmuneService
+from cortex.immune_eval import ImmuneEvalService
 from cortex.ledger_mirror import LedgerMirrorService
 from cortex.init import CortexInit
 from cortex.ipc import GuardianClient, OracleClient, ProphetClient, ScribeClient
@@ -160,6 +161,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, DeliberationService(ROOT).latest())
         elif self.path == "/immune/report":
             self._json(200, ImmuneService(ROOT).report())
+        elif path == "/immune/eval-corpus":
+            self._json(200, ImmuneEvalService(ROOT).corpus())
         elif path == "/ledger/mirror":
             self._json(200, LedgerMirrorService(ROOT).manifest())
         elif self.path == "/immune/memory":
@@ -466,6 +469,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200 if result["status"] in {"deliberated", "refused"} else 400, result)
         elif self.path == "/immune/scan":
             self._json(200, ImmuneService(ROOT).scan(payload))
+        elif self.path == "/immune/eval":
+            self._json(200, ImmuneEvalService(ROOT).run())
         elif self.path == "/immune/quarantine":
             self._json(200, ImmuneService(ROOT).quarantine(str(payload.get("reason", "manual quarantine")), str(payload.get("source", "manual")), payload.get("witness")))
         elif self.path == "/repo/verify":

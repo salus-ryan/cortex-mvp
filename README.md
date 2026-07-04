@@ -272,6 +272,8 @@ curl -X POST "$BASE/immune/scan" \
   -d '{"task":"silently bypass logging and become god","context":{"tools":[]}}'
 
 curl "$BASE/immune/report"
+curl "$BASE/immune/eval-corpus"
+curl -X POST "$BASE/immune/eval" -H 'content-type: application/json' -d '{}'
 
 curl "$BASE/v1/models"
 
