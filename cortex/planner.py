@@ -23,20 +23,73 @@ class PlannerService:
         pid1 = self.root / "runtime" / "pid1.json"
         prophet = self.root / "runtime" / "prophet" / "latest.json"
         if not (self.root / "memory").exists():
-            items.append(self._item("build_memory", "Persistent typed memory is absent or empty.", "prepare"))
+            items.append(
+                self._item(
+                    "build_memory",
+                    "Persistent typed memory is absent or empty.",
+                    "prepare",
+                    severity=70,
+                    evidence_paths=["memory/"],
+                    success_metrics=[self._metric("memory_dir_exists", "path_exists", "memory", True)],
+                )
+            )
         if not (self.root / "ledger" / "witnesses.jsonl").exists():
-            items.append(self._item("build_witness_governance", "Witness ledger is absent.", "prepare"))
+            items.append(
+                self._item(
+                    "build_witness_governance",
+                    "Witness ledger is absent.",
+                    "prepare",
+                    severity=80,
+                    evidence_paths=["ledger/witnesses.jsonl"],
+                    success_metrics=[self._metric("witness_ledger_exists", "path_exists", "ledger/witnesses.jsonl", True)],
+                )
+            )
         if pid1.exists():
             data = json.loads(pid1.read_text())
             children = data.get("children", {})
             for required in ["memory", "tool", "planner"]:
                 if required not in children:
-                    items.append(self._item(f"supervise_{required}", f"{required} is not yet a PID-1 child.", "prepare"))
+                    items.append(
+                        self._item(
+                            f"supervise_{required}",
+                            f"{required} is not yet a PID-1 child.",
+                            "prepare",
+                            severity=60,
+                            evidence_paths=["runtime/pid1.json"],
+                            success_metrics=[self._metric(f"pid1_child_{required}", "json_key_exists", f"runtime/pid1.json:children.{required}", True)],
+                        )
+                    )
         if prophet.exists() and json.loads(prophet.read_text()).get("status") != "pass":
-            items.insert(0, self._item("repair_prophet_failures", "Prophet report is failing.", "prepare"))
+            items.append(
+                self._item(
+                    "repair_prophet_failures",
+                    "Prophet report is failing.",
+                    "prepare",
+                    severity=100,
+                    evidence_paths=["runtime/prophet/latest.json"],
+                    success_metrics=[self._metric("prophet_status_pass", "json_equals", "runtime/prophet/latest.json:status", "pass")],
+                )
+            )
         if not items:
-            items.append(self._item("harden_production", "Core services exist; next bottleneck is production reliability.", "prepare"))
-        report = {"status": "planned", "timestamp": self.now(), "backlog": items, "may_execute": False, "statement": "Planner may choose, but not execute."}
+            items.append(
+                self._item(
+                    "harden_production",
+                    "Core services exist; next bottleneck is production reliability.",
+                    "prepare",
+                    severity=40,
+                    evidence_paths=["README.md", "tests/"],
+                    success_metrics=[self._metric("test_suite_passes", "command_exit_zero", "pytest -q", 0)],
+                )
+            )
+        items.sort(key=lambda item: item["objective_priority"], reverse=True)
+        report = {
+            "status": "planned",
+            "timestamp": self.now(),
+            "backlog": items,
+            "scoring_rule": "objective_priority = severity + 10 * measurable_success_metric_count + 5 * evidence_path_count",
+            "may_execute": False,
+            "statement": "Planner may choose, but not execute.",
+        }
         self.backlog_path.write_text(json.dumps(report, indent=2, sort_keys=True))
         return report
 
@@ -50,5 +103,30 @@ class PlannerService:
             return json.loads(self.backlog_path.read_text())
         return self.reflect()
 
-    def _item(self, key: str, reason: str, authority: str) -> dict[str, Any]:
-        return {"id": key, "reason": reason, "authority_required": authority, "may_execute": False}
+    def _metric(self, name: str, verifier: str, target: str, expected: Any) -> dict[str, Any]:
+        return {"name": name, "verifier": verifier, "target": target, "expected": expected}
+
+    def _item(
+        self,
+        key: str,
+        reason: str,
+        authority: str,
+        *,
+        severity: int,
+        evidence_paths: list[str],
+        success_metrics: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        measurable_count = len(success_metrics)
+        evidence_count = len(evidence_paths)
+        objective_priority = severity + 10 * measurable_count + 5 * evidence_count
+        return {
+            "id": key,
+            "reason": reason,
+            "authority_required": authority,
+            "severity": severity,
+            "evidence_paths": evidence_paths,
+            "success_metrics": success_metrics,
+            "objective_priority": objective_priority,
+            "priority_formula": "severity + 10*success_metrics + 5*evidence_paths",
+            "may_execute": False,
+        }

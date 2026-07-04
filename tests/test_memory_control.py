@@ -51,5 +51,7 @@ def test_memory_search_returns_ranked_quality_records(tmp_path: Path):
     assert result["status"] == "ok"
     assert result["records"][0]["id"] == high["id"]
     assert result["records"][-1]["id"] == low["id"]
-    assert result["records"][0]["quality"]["grade"] == "high"
+    assert result["records"][0]["quality"]["score"] >= 75
+    assert result["records"][0]["quality"]["threshold_band"] == "75-100"
+    assert result["records"][0]["quality"]["components"]["confidence_points"] == 33
     assert result["may_execute"] is False

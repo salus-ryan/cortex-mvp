@@ -122,7 +122,17 @@ class MemoryService:
         out = dict(rec)
         out["quality"] = {
             "score": score,
-            "grade": "high" if score >= 75 else "medium" if score >= 50 else "low",
+            "threshold_band": "75-100" if score >= 75 else "50-74" if score >= 50 else "0-49",
+            "components": {
+                "confidence_points": round(confidence * 35),
+                "source_points": 15 if rec.get("source") else 0,
+                "detail_points": 20 if words >= 8 else 10 if words >= 3 else 0,
+                "hash_points": 5 if rec.get("sha256") else 0,
+                "law_points": 5 if rec.get("law") else 0,
+                "witness_points": 5 if rec.get("witness") else 0,
+                "freshness_points": 10 if age_days is None or age_days <= 30 else 5 if age_days <= 180 else 0,
+                "duplicate_penalty": min(25, 10 * (duplicate_count - 1)) if duplicate_count > 1 else 0,
+            },
             "reasons": reasons,
             "duplicate_count": duplicate_count,
             "may_execute": False,

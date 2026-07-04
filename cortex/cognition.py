@@ -209,8 +209,15 @@ class CognitionKernel:
             CapabilityProbe(
                 "planning",
                 15,
-                self._existing(files, ["cortex/planner.py", "cortex/deliberation.py", "cortex/loop.py", "cortex/step_function.py"]),
-                ["hierarchical task decomposition", "counterfactual planning", "explicit success metrics per goal"],
+                self._existing(files, ["cortex/planner.py", "cortex/deliberation.py", "cortex/loop.py", "cortex/step_function.py"])
+                + self._code_evidence(
+                    "cortex/planner.py",
+                    {
+                        "explicit success metrics per goal": "success_metrics",
+                        "objective priority scoring": "objective_priority",
+                    },
+                ),
+                ["hierarchical task decomposition", "counterfactual planning"],
             ),
             CapabilityProbe(
                 "tool_use_under_law",

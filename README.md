@@ -236,6 +236,7 @@ curl "$BASE/memory/search?q=Cortex&type=factual"
 
 curl -X POST "$BASE/planner/reflect" -H 'content-type: application/json' -d '{}'
 curl -X POST "$BASE/planner/choose-next" -H 'content-type: application/json' -d '{}'
+# Planner backlog items include objective_priority, evidence_paths, and measurable success_metrics.
 
 curl -X POST "$BASE/step" \
   -H 'content-type: application/json' \
@@ -401,7 +402,7 @@ The system has two connected strata.
 5. **Prophet (`cortex.prophet`)**: Deterministic drift, law, PID-1, guardian refusal, oracle boundary, and ledger checks.
 6. **Memory (`cortex.memory_service`)**: Typed, sourced JSONL memory with personal-memory witness requirements, quality scoring, duplicate detection, and ranked search/report endpoints.
 7. **Witness (`cortex.witness`)**: Human attestation and governance primitives.
-8. **Planner (`cortex.planner`)**: Self-organization backlog and next-action choice; may choose but not execute.
+8. **Planner (`cortex.planner`)**: Self-organization backlog and objectively scored next-action choice with evidence paths and measurable success metrics; may choose but not execute.
 9. **Deliberation (`cortex.deliberation`)**: Local multi-step reasoning loop: evidence, specialists, Guardian, Prophet, scored recommendations; never executes.
 10. **Immune (`cortex.immune`)**: Artificial immune system for antigen detection, quarantine recommendations, immune memory, and rejected-memory records.
 11. **Pi Extension (`.pi/extensions/cortex.ts`)**: Lets Pi use Cortex as an immune/governance layer and registers Cortex as an OpenAI-compatible local provider.
