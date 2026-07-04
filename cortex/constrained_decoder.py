@@ -43,7 +43,7 @@ ANCHOR_RELATIONS: Dict[str, List[str]] = {
     "@repair":  ["rollback", "diagnose", "patch"],
     "@state":   ["update", "snapshot"],
     "@verify":  ["run", "assert"],
-    "@budget":  ["check", "report"],
+    "@budget":  ["spend", "check", "snapshot"],
 }
 
 # Required fields per anchor+relation (minimum set)
@@ -53,18 +53,19 @@ REQUIRED_FIELDS: Dict[Tuple[str, str], List[str]] = {
     ("@halt", "defer"):     ["status", "confidence", "evidence"],
     ("@tool", "call"):      ["name"],
     ("@tool", "deny"):      ["name", "reason"],
-    ("@memory", "write"):   ["tier", "content"],
-    ("@memory", "read"):    ["tier", "query"],
-    ("@repair", "rollback"):["target"],
-    ("@repair", "diagnose"):["target"],
-    ("@repair", "patch"):   ["target", "fix"],
-    ("@state", "update"):   ["key", "value"],
+    ("@memory", "write"):   ["key", "value"],
+    ("@memory", "read"):    ["query"],
+    ("@repair", "rollback"): ["artifact"],
+    ("@repair", "diagnose"): [],
+    ("@repair", "patch"):   ["target"],
+    ("@state", "update"):   [],
     ("@state", "snapshot"): [],
-    ("@verify", "run"):     ["check"],
-    ("@verify", "assert"):  ["claim"],
+    ("@verify", "run"):     ["type", "target"],
+    ("@verify", "assert"):  ["type", "target"],
+    ("@budget", "spend"):   ["units", "reason"],
     ("@budget", "check"):   [],
-    ("@budget", "report"):  [],
-    ("@memory", "compress"):["tier"],
+    ("@budget", "snapshot"): [],
+    ("@memory", "compress"): ["source", "target"],
     ("@memory", "ignore"):  [],
 }
 

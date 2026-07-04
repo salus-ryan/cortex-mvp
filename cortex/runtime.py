@@ -334,8 +334,13 @@ class CortexRuntime:
                     self.logger.denied(task.task_id, record, final_check.reason, "denied_verify")
                     continue
 
+            # --- Pre-mutation snapshot ---
+            # Capture mutable file state before execution so rollback restores the
+            # original artifact, not the post-patch contents.
+            self._snapshot_before_mutation(action, rollback, step)
+
             # --- Execute action ---
-            execution_result = self._execute(action, memory, rollback, step)
+            execution_result = self._execute(action, memory, rollback, step, budget)
 
             # --- Debit budget ---
             try:
@@ -416,6 +421,7 @@ class CortexRuntime:
         memory: Memory,
         rollback: RollbackManager,
         step: int,
+        budget: Budget,
     ) -> ExecutionResult:
         """Dispatch action to the appropriate handler."""
         if action.anchor == "@tool":
@@ -442,9 +448,34 @@ class CortexRuntime:
             return self._execute_verify(action)
 
         elif action.anchor == "@budget":
-            return ExecutionResult(tool="budget", success=True, output="budget checked")
+            return self._execute_budget(action, budget)
 
         return ExecutionResult(tool="unknown", success=False, error=f"no handler for {action.anchor}")
+
+    def _snapshot_before_mutation(self, action: SCLAction, rollback: RollbackManager, step: int) -> None:
+        """Snapshot mutable artifacts before a write-limited action executes."""
+        if action.anchor == "@tool" and action.relation == "call" and action.fields.get("name") == "shell.patch":
+            target = action.fields.get("target", "")
+            if target:
+                rollback.snapshot_file(str(target), step)
+        elif action.anchor == "@repair" and action.relation == "patch":
+            target = action.fields.get("target", "")
+            if target:
+                rollback.snapshot_file(str(target), step)
+
+    def _execute_budget(self, action: SCLAction, budget: Budget) -> ExecutionResult:
+        """Execute @budget operations with explicit, auditable semantics."""
+        if action.relation in {"check", "snapshot"}:
+            return ExecutionResult(tool="budget", success=True, output=json.dumps(budget.snapshot().to_dict(), sort_keys=True))
+        if action.relation == "spend":
+            units = int(action.fields.get("units", 0))
+            reason = str(action.fields.get("reason", "explicit budget spend"))
+            try:
+                budget.debit(units, reason=reason, is_tool_call=False)
+            except BudgetExhaustedError as exc:
+                return ExecutionResult(tool="budget", success=False, error=str(exc))
+            return ExecutionResult(tool="budget", success=True, output=f"spent {units} units: {reason}")
+        return ExecutionResult(tool="budget", success=False, error=f"unknown budget relation '{action.relation}'")
 
     def _execute_memory(self, action: SCLAction, memory: Memory, step: int) -> ExecutionResult:
         """Execute a @memory action."""
@@ -515,9 +546,30 @@ class CortexRuntime:
         elif verify_type == "git_diff":
             return self.tool_registry.execute("git.diff", args=target)
         elif verify_type == "lint":
-            return ExecutionResult(tool="verify.lint", success=True, output="lint passed (stub)")
+            lint_target = Path(self.workspace) / target if target and not Path(target).is_absolute() else Path(target or self.workspace)
+            try:
+                if lint_target.is_file() and lint_target.suffix == ".py":
+                    import py_compile
+                    py_compile.compile(str(lint_target), doraise=True)
+                elif lint_target.is_dir():
+                    for py_file in lint_target.rglob("*.py"):
+                        import py_compile
+                        py_compile.compile(str(py_file), doraise=True)
+                else:
+                    return ExecutionResult(tool="verify.lint", success=False, error=f"lint target '{target}' not found or unsupported")
+                return ExecutionResult(tool="verify.lint", success=True, output="python syntax lint passed")
+            except Exception as exc:
+                return ExecutionResult(tool="verify.lint", success=False, error=str(exc))
         elif verify_type == "policy":
-            return ExecutionResult(tool="verify.policy", success=True, output="policy check passed (stub)")
+            parsed = scl_parse(target)
+            if not parsed.valid or parsed.action is None:
+                return ExecutionResult(tool="verify.policy", success=False, error=parsed.error)
+            # Use a generous throwaway budget for deterministic policy validation.
+            tmp_budget = Budget(max_units=999, max_tool_calls=999, max_steps=999)
+            result = self.policy.check(parsed.action, tmp_budget, self.tool_registry)
+            if result.allowed:
+                return ExecutionResult(tool="verify.policy", success=True, output=result.reason)
+            return ExecutionResult(tool="verify.policy", success=False, error=result.reason)
 
         return ExecutionResult(tool="verify", success=False, error=f"unknown verify type '{verify_type}'")
 
@@ -548,9 +600,14 @@ class CortexRuntime:
         elif action.anchor == "@verify" and action.relation == "run":
             if verify_result.passed:
                 new_state["last_verify"] = "passed"
+                new_state["verified_evidence"] = str(getattr(execution_result, "summary", ""))[:500]
             else:
                 new_state["last_verify"] = "failed"
                 new_state["last_error"] = verify_result.reason
+
+        elif action.anchor == "@tool" and execution_result.success:
+            new_state["last_tool"] = action.fields.get("name", "")
+            new_state["verified_evidence"] = str(getattr(execution_result, "summary", ""))[:500]
 
         return new_state
 

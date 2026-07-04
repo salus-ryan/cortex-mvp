@@ -133,19 +133,10 @@ class RollbackManager:
         if not hasattr(action, "anchor"):
             return
 
-        # Record file snapshots before patch operations
-        if action.anchor == "@tool" and action.relation == "call":
-            name = action.fields.get("name", "")
-            if name == "shell.patch":
-                target = action.fields.get("target", "")
-                if target:
-                    self.snapshot_file(target, step)
-
-        # Record repair patches
-        if action.anchor == "@repair" and action.relation == "patch":
-            target = action.fields.get("target", "")
-            if target:
-                self.snapshot_file(target, step)
+        # File snapshots are intentionally captured by the runtime before
+        # mutation. Post-execution snapshots would record modified contents and
+        # break rollback integrity. This hook remains for future non-file
+        # session artifacts.
 
     # ------------------------------------------------------------------
     # Rollback

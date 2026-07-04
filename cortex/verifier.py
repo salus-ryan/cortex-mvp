@@ -306,6 +306,24 @@ class Verifier:
                 reason="halt requires non-empty evidence field citing verifier or tool output",
             )
 
+        verified_evidence = str(state.get("verified_evidence", ""))
+        last_verify = state.get("last_verify")
+        # When runtime state contains verified evidence, require the halt evidence
+        # to be linked to it rather than allowing an unrelated claim. Direct unit
+        # tests may call final_check with an empty state; that remains a schema-
+        # level check only.
+        if verified_evidence and last_verify == "passed":
+            ev_l = evidence.lower()
+            ve_l = verified_evidence.lower()
+            evidence_tokens = {tok for tok in re.findall(r"[a-z0-9_]+", ev_l) if len(tok) >= 4}
+            verified_tokens = {tok for tok in re.findall(r"[a-z0-9_]+", ve_l) if len(tok) >= 4}
+            has_link = bool(evidence_tokens & verified_tokens) or any(tok in ev_l for tok in ("verified", "passed", "success"))
+            if not has_link:
+                return FinalCheckResult(
+                    passed=False,
+                    reason="halt evidence is not linked to the latest verified observation",
+                )
+
         return FinalCheckResult(
             passed=True,
             reason="halt accepted",

@@ -232,7 +232,7 @@ class ToolRegistry:
         # Allowlist of safe read-only commands
         safe_prefixes = (
             "cat ", "head ", "tail ", "sed ", "grep ", "ls ", "find ",
-            "wc ", "diff ", "echo ", "pwd", "whoami", "date",
+            "wc ", "diff ", "echo ", "pwd", "date",
         )
         cmd = args.strip()
         if not any(cmd.startswith(p) for p in safe_prefixes):
@@ -241,10 +241,12 @@ class ToolRegistry:
                 success=False,
                 error=f"command '{cmd}' is not in the read-only allowlist",
             )
+        if "/etc/" in cmd or "/dev/" in cmd:
+            return ExecutionResult(tool="shell.readonly", success=False, error="absolute system paths are not allowed")
         try:
             proc = subprocess.run(
-                cmd,
-                shell=True,
+                cmd.split(),
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=10,
