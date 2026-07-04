@@ -30,6 +30,10 @@ human control
 
 ## Imported slices
 
+### Current status
+
+Issue tracker: `#3` tracks this import program. Completed: `tool-algebra-plugin` slice 1 and `black-box` slice 1. Next target: `ghost-qa` browser/mobile QA plan.
+
 ### tool-algebra-plugin slice 1
 
 Implemented local Cortex equivalents:
